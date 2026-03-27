@@ -22,8 +22,11 @@ async def approve_request(*, session: AsyncSession, request_id, approver_id) -> 
     if not access_request:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access request not found")
 
-    if access_request.status == RequestStatus.approved:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Request already approved")
+    if access_request.status != RequestStatus.pending:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Request is not pending and cannot be approved",
+        )
 
     if approver_id == access_request.requester_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requester cannot approve")
@@ -49,6 +52,7 @@ async def approve_request(*, session: AsyncSession, request_id, approver_id) -> 
 
     approval = Approval(request_id=request_id, approver_id=approver_id)
     session.add(approval)
+    access_request.approvals.append(approval)
     await session.flush()
 
     await log_action(
@@ -78,22 +82,24 @@ async def check_threshold(*, session: AsyncSession, access_request: AccessReques
             session=session,
             document_id=access_request.document_id,
             user_id=access_request.requester_id,
-            action="Threshold met — access granted",
+            action="Threshold met — secure access granted",
             details=str(access_request.id),
         )
     return True
 
 
 async def reconstruct_key_for_request(*, session: AsyncSession, access_request: AccessRequest) -> str:
-    approver_ids = [approval.approver_id for approval in access_request.approvals]
     share_rows = await session.execute(
         select(DocumentParticipant.share_index, DocumentParticipant.key_share)
+        .join(Approval, Approval.approver_id == DocumentParticipant.user_id)
         .where(
             DocumentParticipant.document_id == access_request.document_id,
-            DocumentParticipant.user_id.in_(approver_ids),
+            Approval.request_id == access_request.id,
         )
     )
-    shares: Iterable[Tuple[int, str]] = sorted(share_rows.all(), key=lambda row: row[0])
+    shares: Iterable[Tuple[int, str]] = sorted(
+        {(row[0], row[1]) for row in share_rows.all()}, key=lambda row: row[0]
+    )
     if len(shares) < access_request.document.threshold:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -83,12 +83,13 @@ async def edit_document(
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    if payload.request_id:
-        access_request = await session.get(AccessRequest, payload.request_id)
-        if not access_request or access_request.document_id != payload.document_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access request not found")
-        if access_request.status != RequestStatus.approved:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access request not approved")
+    access_request = await session.get(AccessRequest, payload.request_id)
+    if not access_request or access_request.document_id != payload.document_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access request not found")
+    if access_request.requester_id != payload.editor_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requester mismatch")
+    if access_request.status != RequestStatus.approved:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access request not approved")
 
     # Decrypt and re-encrypt with new content using provided key
     encryption_service.decrypt(document.encrypted_content, encryption_key)  # validates key

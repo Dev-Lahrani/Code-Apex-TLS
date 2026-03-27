@@ -36,7 +36,7 @@ async def request_access(*, session: AsyncSession, payload: AccessRequestCreate)
             and_(
                 AccessRequest.document_id == payload.document_id,
                 AccessRequest.requester_id == payload.requester_id,
-                AccessRequest.status == RequestStatus.pending,
+                AccessRequest.status.in_([RequestStatus.pending, RequestStatus.approved]),
             )
         )
     )
