@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Iterable
+import hashlib
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import AccessRequest, Document, DocumentParticipant, RequestStatus, User
 from app.schemas import DocumentCreate, DocumentEdit
 from app.services.logging_service import log_action
+from app.services.ipfs_service import upload_to_ipfs
 from app.services.approval_service import calculate_threshold
 from app.utils import encryption_service, key_sharing_service
 
@@ -63,7 +65,26 @@ async def create_document(
     )
     session.add_all(list(participants))
 
-    document.encrypted_content = encryption_service.encrypt(payload.content, encryption_key)
+    encrypted_content = encryption_service.encrypt(payload.content, encryption_key)
+    content_hash = hashlib.sha256(encrypted_content.encode()).hexdigest()
+    cid = await upload_to_ipfs(
+        {
+            "document_id": str(document.id),
+            "title": payload.title,
+            "encrypted_content": encrypted_content,
+        }
+    )
+    document.encrypted_content = encrypted_content
+    document.content_hash = content_hash
+    document.ipfs_cid = cid
+
+    await log_action(
+        session=session,
+        document_id=document.id,
+        user_id=payload.owner_id,
+        action="Stored on IPFS with CID",
+        details=cid,
+    )
 
     await log_action(
         session=session,
@@ -98,7 +119,26 @@ async def edit_document(
 
     # Decrypt and re-encrypt with new content using provided key
     encryption_service.decrypt(document.encrypted_content, encryption_key)  # validates key
-    document.encrypted_content = encryption_service.encrypt(payload.content, encryption_key)
+    encrypted_content = encryption_service.encrypt(payload.content, encryption_key)
+    content_hash = hashlib.sha256(encrypted_content.encode()).hexdigest()
+    cid = await upload_to_ipfs(
+        {
+            "document_id": str(document.id),
+            "request_id": str(payload.request_id),
+            "encrypted_content": encrypted_content,
+        }
+    )
+    document.encrypted_content = encrypted_content
+    document.content_hash = content_hash
+    document.ipfs_cid = cid
+
+    await log_action(
+        session=session,
+        document_id=document.id,
+        user_id=payload.editor_id,
+        action="Stored on IPFS with CID",
+        details=cid,
+    )
 
     await log_action(
         session=session,

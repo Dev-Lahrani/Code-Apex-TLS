@@ -58,5 +58,7 @@ class DocumentRead(BaseModel):
     participants: list[UUID]
     created_at: datetime
     content: str | None = None
+    ipfs_cid: str | None = None
+    content_hash: str | None = None
 
     model_config = {"from_attributes": True}

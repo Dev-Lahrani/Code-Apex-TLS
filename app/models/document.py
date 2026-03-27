@@ -48,6 +48,8 @@ class Document(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
+    ipfs_cid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     threshold: Mapped[int] = mapped_column(Integer, nullable=False)
     threshold_type: Mapped[ThresholdType] = mapped_column(
         Enum(ThresholdType, name="threshold_type"),

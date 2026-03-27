@@ -26,7 +26,11 @@ def _to_read(document: Document, *, content: str | None = None) -> DocumentRead:
         threshold=document.threshold,
         participants=participant_ids,
         created_at=document.created_at,
+        ipfs_cid=document.ipfs_cid,
+        content_hash=document.content_hash,
         content=content,
+        threshold_type=document.threshold_type,
+        threshold_value=document.threshold_value,
     )
 
 
