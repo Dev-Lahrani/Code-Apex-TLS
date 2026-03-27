@@ -2,7 +2,7 @@ import base64
 from typing import Iterable, List, Tuple
 
 # Use Crypto namespace provided by pycryptodome.
-from Crypto.Protocol.SecretSharing import Shamir
+from Cryptodome.Protocol.SecretSharing import Shamir
 
 
 def _encode_share(share: bytes) -> str:
