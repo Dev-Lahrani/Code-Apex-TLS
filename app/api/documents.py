@@ -1,4 +1,6 @@
+import hashlib
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -6,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_session
-from app.models import AccessRequest, Document, DocumentParticipant, RequestStatus, User
-from app.schemas import DocumentCreate, DocumentRead
+from app.models import AccessRequest, ActivityLog, Document, DocumentParticipant, RequestStatus, User
+from app.schemas import DocumentCreate, DocumentEdit, DocumentRead
 from app.utils import encryption_service, key_sharing_service
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -173,3 +175,102 @@ async def get_document(
         ) from exc
 
     return _to_schema(document, content=content)
+
+
+@router.post("/edit", response_model=DocumentRead, status_code=status.HTTP_200_OK)
+async def edit_document(
+    payload: DocumentEdit,
+    session: AsyncSession = Depends(get_session),
+) -> DocumentRead:
+    document_result = await session.execute(
+        select(Document)
+        .options(selectinload(Document.participants))
+        .where(Document.id == payload.document_id)
+    )
+    document = document_result.scalars().first()
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    access_request_result = await session.execute(
+        select(AccessRequest)
+        .options(selectinload(AccessRequest.approvals))
+        .where(AccessRequest.id == payload.request_id)
+    )
+    access_request = access_request_result.scalars().first()
+    if not access_request or access_request.document_id != payload.document_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Access request not found",
+        )
+
+    if access_request.status != RequestStatus.approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access request not approved",
+        )
+
+    participant_row = await session.execute(
+        select(DocumentParticipant).where(
+            DocumentParticipant.document_id == payload.document_id,
+            DocumentParticipant.user_id == payload.editor_id,
+        )
+    )
+    if not participant_row.scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Editor is not a participant",
+        )
+
+    approver_ids = [approval.approver_id for approval in access_request.approvals]
+    share_rows = await session.execute(
+        select(DocumentParticipant.share_index, DocumentParticipant.key_share)
+        .where(
+            DocumentParticipant.document_id == payload.document_id,
+            DocumentParticipant.user_id.in_(approver_ids),
+        )
+    )
+    shares = sorted(share_rows.all(), key=lambda row: row[0])
+
+    if len(shares) < document.threshold:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough approvals to reconstruct key",
+        )
+
+    try:
+        encryption_key = key_sharing_service.reconstruct_key(
+            [(share_index, share) for share_index, share in shares][: document.threshold]
+        )
+        decrypted_content = encryption_service.decrypt(document.encrypted_content, encryption_key)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    # Apply edit: replace content with provided payload
+    new_content = payload.content
+    encrypted_payload = encryption_service.encrypt(new_content, encryption_key)
+    document.encrypted_content = encrypted_payload
+
+    timestamp = datetime.utcnow().isoformat()
+    action = "document_edited"
+    hash_value = hashlib.sha256(f"{action}{timestamp}".encode()).hexdigest()
+    log_entry = ActivityLog(
+        document_id=payload.document_id,
+        user_id=payload.editor_id,
+        action=action,
+        timestamp=datetime.fromisoformat(timestamp),
+        hash=hash_value,
+        tx_hash=None,
+        details=str(payload.request_id),
+    )
+    session.add(log_entry)
+
+    await session.commit()
+    await session.refresh(document, attribute_names=["participants"])
+
+    return _to_schema(document, content=new_content)

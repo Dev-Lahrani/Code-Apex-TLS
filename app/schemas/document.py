@@ -23,6 +23,13 @@ class DocumentCreate(DocumentBase):
     pass
 
 
+class DocumentEdit(BaseModel):
+    document_id: UUID
+    request_id: UUID
+    editor_id: UUID
+    content: str
+
+
 class DocumentRead(BaseModel):
     id: UUID
     title: str
