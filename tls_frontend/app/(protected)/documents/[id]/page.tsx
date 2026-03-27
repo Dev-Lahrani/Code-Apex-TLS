@@ -163,15 +163,66 @@ const [document, setDocument] = useState<Document | null>(null)
           setMissing(false)
         }
 
-          const mapped = mapApiDocument(target, participantLookup, {
-            currentApprovals: activeRequest?.status === "approved" ? target?.threshold ?? 0 : 0,
-            status: activeRequest?.status === "approved" ? "unlocked" : activeRequest ? "pending" : "locked",
-            requestId: activeRequest?.id,
-          })
-          if (!cancelled) {
-            setDocument(mapped)
-            setContent((prev) => (prev ? prev : mapped.content))
+        const logResponse = await getLogs(id, currentUserId)
+        const mappedLogs = mapApiLogs(logResponse.data.logs)
+        if (!cancelled) {
+          setLogs(mappedLogs)
+        }
+
+        // Derive active request from logs if cache is missing/stale
+        let derivedRequest: ApiAccessRequest | null = activeRequest
+        if (!derivedRequest) {
+          const ownRequest = mappedLogs.find(
+            (entry) => entry.action === "User requested access" && entry.userId === currentUserId
+          )
+          if (ownRequest?.details) {
+            derivedRequest = {
+              id: ownRequest.details,
+              requester_id: currentUserId,
+              status: "pending",
+              created_at: ownRequest.timestamp,
+            }
           }
+        }
+
+        if (!derivedRequest) {
+          const anyRequest = mappedLogs.find((entry) => entry.action === "User requested access")
+          if (anyRequest?.details && anyRequest.userId && anyRequest.userId !== currentUserId) {
+            derivedRequest = {
+              id: anyRequest.details,
+              requester_id: anyRequest.userId,
+              status: "pending",
+              created_at: anyRequest.timestamp,
+            }
+          }
+        }
+
+        if (derivedRequest) {
+          const thresholdMet = mappedLogs.some(
+            (entry) =>
+              entry.details === derivedRequest!.id &&
+              entry.action.toLowerCase().includes("threshold met")
+          )
+          if (thresholdMet) {
+            derivedRequest = { ...derivedRequest, status: "approved" }
+          }
+        }
+
+        if (!cancelled && derivedRequest && derivedRequest.id !== activeRequest?.id) {
+          setActiveRequest(derivedRequest)
+        } else if (!cancelled && !derivedRequest && activeRequest) {
+          setActiveRequest(null)
+        }
+
+        const mapped = mapApiDocument(target, participantLookup, {
+          currentApprovals: derivedRequest?.status === "approved" ? target?.threshold ?? 0 : 0,
+          status: derivedRequest?.status === "approved" ? "unlocked" : derivedRequest ? "pending" : "locked",
+          requestId: derivedRequest?.id,
+        })
+        if (!cancelled) {
+          setDocument(mapped)
+          setContent((prev) => (prev ? prev : mapped.content))
+        }
 
         if (activeRequest?.status === "approved" && activeRequest.requester_id === currentUserId) {
           const docDetail = await getDocument(target!.id, activeRequest.id, currentUserId)
@@ -195,57 +246,62 @@ const [document, setDocument] = useState<Document | null>(null)
           }
         }
 
-        const logResponse = await getLogs(id, currentUserId)
-        if (!cancelled) {
-          const mappedLogs = mapApiLogs(logResponse.data.logs)
-          setLogs(mappedLogs)
-
-          if (activeRequest) {
-            const approvalLogs = mappedLogs.filter(
+        if (derivedRequest) {
+          const approvalLogs = mappedLogs.filter(
+            (entry) =>
+              entry.details === derivedRequest!.id &&
+              entry.action.toLowerCase().includes("approved")
+          )
+          const approvedUsers = new Set(
+            approvalLogs
+              .map((entry) => entry.userId)
+              .filter((val): val is string => !!val)
+          )
+          const approvalsCount = approvedUsers.size
+          const thresholdMet =
+            derivedRequest.status === "approved" ||
+            approvalsCount >= mapped.requiredApprovals ||
+            mappedLogs.some(
               (entry) =>
-                entry.details === activeRequest.id &&
-                entry.action.toLowerCase().includes("approved")
-            )
-            const approvedUsers = new Set(
-              approvalLogs
-                .map((entry) => entry.userId)
-                .filter((val): val is string => !!val)
-            )
-             const approvalsCount = approvedUsers.size
-             const thresholdMet =
-               activeRequest.status === "approved" ||
-               approvalsCount >= mapped.requiredApprovals ||
-               mappedLogs.some(
-                 (entry) =>
-                  entry.details === activeRequest.id &&
-                  entry.action.toLowerCase().includes("threshold met")
-              )
-
-            setDocument((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    currentApprovals: thresholdMet
-                      ? prev.requiredApprovals
-                      : Math.min(approvalsCount, prev.requiredApprovals),
-                    status: thresholdMet ? "unlocked" : "pending",
-                    participants: prev.participants.map((p) => {
-                      if (approvedUsers.has(p.id)) {
-                        return { ...p, status: "approved" as const }
-                      }
-                      if (activeRequest) {
-                        return { ...p, status: "pending" as const }
-                      }
-                      return { ...p, status: "not-requested" as const }
-                    }),
-                  }
-                : prev
+                entry.details === derivedRequest!.id &&
+                entry.action.toLowerCase().includes("threshold met")
             )
 
-            if (thresholdMet && activeRequest.status !== "approved") {
-              setActiveRequest({ ...activeRequest, status: "approved" })
-            }
+          setDocument((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  currentApprovals: thresholdMet
+                    ? prev.requiredApprovals
+                    : Math.min(approvalsCount, prev.requiredApprovals),
+                  status: thresholdMet ? "unlocked" : "pending",
+                  participants: prev.participants.map((p) => {
+                    if (approvedUsers.has(p.id)) {
+                      return { ...p, status: "approved" as const }
+                    }
+                    if (derivedRequest) {
+                      return { ...p, status: "pending" as const }
+                    }
+                    return { ...p, status: "not-requested" as const }
+                  }),
+                }
+              : prev
+          )
+
+          if (thresholdMet && derivedRequest.status !== "approved") {
+            setActiveRequest({ ...derivedRequest, status: "approved" })
           }
+        } else {
+          setDocument((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  currentApprovals: 0,
+                  status: "locked",
+                  participants: prev.participants.map((p) => ({ ...p, status: "not-requested" as const })),
+                }
+              : prev
+          )
         }
       } catch (error) {
         if (!cancelled) {
