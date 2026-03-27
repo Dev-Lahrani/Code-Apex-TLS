@@ -37,7 +37,7 @@ export default function DocumentViewPage({ params }: PageProps) {
 const { id } = use(params)
 const { user } = useAuth()
 
-const REQUEST_STORAGE_KEY = "zerotrust-active-requests"
+const REQUEST_STORAGE_KEY = "secure_docs-active-requests"
 const ACCESS_REQUEST_TTL_MS =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_ACCESS_REQUEST_TTL_MS
     ? Number(process.env.NEXT_PUBLIC_ACCESS_REQUEST_TTL_MS)

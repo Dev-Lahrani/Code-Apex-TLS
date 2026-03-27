@@ -1,4 +1,4 @@
-# CodeApex TLS
+# SECURE_Docs
 
 Zero-trust document collaboration stack with a FastAPI backend and a Next.js frontend. Documents are encrypted with AES-256, split into key shares via Shamir Secret Sharing, and unlocked only after threshold approvals. Optional blockchain logging can emit activity proofs on-chain.
 
@@ -22,6 +22,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+If you hit the `externally-managed-environment` error, do not use system pip; either activate the venv as above or run commands explicitly via `.venv/bin/pip`, `.venv/bin/alembic`, and `.venv/bin/uvicorn`.
 3) Initialize the database (versions folder is empty by default):
 ```
 alembic revision --autogenerate -m "init"

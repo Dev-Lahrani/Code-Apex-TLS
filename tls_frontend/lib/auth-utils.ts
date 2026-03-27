@@ -11,7 +11,7 @@ export interface AuthState {
   error: string | null
 }
 
-const STORAGE_KEY = 'zerotrust_auth'
+const STORAGE_KEY = 'secure_docs_auth'
 
 export function saveAuthState(user: User) {
   if (typeof window !== 'undefined') {

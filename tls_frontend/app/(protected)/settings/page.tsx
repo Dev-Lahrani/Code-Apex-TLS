@@ -102,7 +102,7 @@ export default function SettingsPage() {
                   <Shield className="h-5 w-5 text-success" />
                 </div>
                 <div>
-                  <p className="font-medium">Zero Trust Mode</p>
+                  <p className="font-medium">SECURE_Docs Mode</p>
                   <p className="text-sm text-muted-foreground">
                     All documents require threshold approval
                   </p>

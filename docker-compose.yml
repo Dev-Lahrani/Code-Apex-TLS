@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-zerotrust}
+      POSTGRES_DB: ${POSTGRES_DB:-secure_docs}
       POSTGRES_USER: ${POSTGRES_USER:-dev}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev123}
     ports:
@@ -14,7 +14,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dev} -d ${POSTGRES_DB:-zerotrust}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dev} -d ${POSTGRES_DB:-secure_docs}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,7 +31,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://dev:dev123@postgres:5432/zerotrust}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://dev:dev123@postgres:5432/secure_docs}
     ports:
       - "8000:8000"
     restart: unless-stopped

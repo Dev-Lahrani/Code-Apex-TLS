@@ -95,7 +95,7 @@ export function AuthForm({ type }: AuthFormProps) {
         <p className="text-sm text-muted-foreground">
           {type === 'login'
             ? 'Sign in to access your documents'
-            : 'Get started with ZeroTrust Docs'}
+            : 'Get started with SECURE_Docs'}
         </p>
       </div>
 

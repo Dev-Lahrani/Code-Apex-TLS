@@ -36,7 +36,7 @@ export function TopNavbar({ title }: TopNavbarProps) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [lastSeenAt, setLastSeenAt] = useState(0)
-  const storageKey = user?.id ? `zerotrust-notifications-last-seen:${user.id}` : null
+  const storageKey = user?.id ? `secure_docs-notifications-last-seen:${user.id}` : null
 
   useEffect(() => {
     if (!storageKey || typeof window === "undefined") return

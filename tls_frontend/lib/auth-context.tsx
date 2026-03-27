@@ -22,8 +22,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const AUTH_STORAGE_KEY = "zerotrust-auth"
-const PASSWORD_STORAGE_KEY = "zerotrust-auth-passwords"
+const AUTH_STORAGE_KEY = "secure_docs-auth"
+const PASSWORD_STORAGE_KEY = "secure_docs-auth-passwords"
 
 async function hashPassword(password: string): Promise<string> {
   // Pure JS SHA-256 — works on HTTP, SSR, and all browsers
