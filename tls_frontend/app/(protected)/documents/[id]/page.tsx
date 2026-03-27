@@ -38,6 +38,10 @@ const { id } = use(params)
 const { user } = useAuth()
 
 const REQUEST_STORAGE_KEY = "zerotrust-active-requests"
+const ACCESS_REQUEST_TTL_MS =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_ACCESS_REQUEST_TTL_MS
+    ? Number(process.env.NEXT_PUBLIC_ACCESS_REQUEST_TTL_MS)
+    : 60 * 60 * 1000) || 60 * 60 * 1000
 
 const [directory, setDirectory] = useState<UserDirectory>({})
 const [document, setDocument] = useState<Document | null>(null)
@@ -125,6 +129,25 @@ const [isLoading, setIsLoading] = useState(true)
         if (!isPoll) {
           setIsLoading(true)
         }
+
+        // Expire local cache proactively
+        if (activeRequest?.created_at) {
+          const createdAt = new Date(activeRequest.created_at).getTime()
+          if (!Number.isNaN(createdAt) && Date.now() - createdAt > ACCESS_REQUEST_TTL_MS) {
+            setActiveRequest(null)
+            setDocument((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    status: "locked",
+                    currentApprovals: 0,
+                    participants: prev.participants.map((p) => ({ ...p, status: "not-requested" as const })),
+                  }
+                : prev
+            )
+          }
+        }
+
         const documentsResponse = await getDocuments(currentUserId)
         const target = documentsResponse.data.documents.find((doc) => doc.id === id)
         if (!target) {
@@ -279,6 +302,10 @@ const [isLoading, setIsLoading] = useState(true)
         title: "Access requested",
         description: "Waiting for participant approvals.",
       })
+      // Persist created_at for TTL checks
+      if (response.data.request.created_at) {
+        setActiveRequest(response.data.request)
+      }
     } catch (error) {
       toast({
         title: "Request failed",
