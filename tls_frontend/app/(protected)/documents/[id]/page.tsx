@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, use } from "react"
+import { useEffect, useMemo, useRef, useState, use } from "react"
 import { notFound } from "next/navigation"
 import { AppShell } from "@/components/app-shell"
 import { AccessControlPanel } from "@/components/access-control-panel"
@@ -46,6 +46,7 @@ const ACCESS_REQUEST_TTL_MS =
 const [directory, setDirectory] = useState<UserDirectory>({})
 const [document, setDocument] = useState<Document | null>(null)
   const [content, setContent] = useState("")
+  const isDirtyRef = useRef(false)
   const [isRequesting, setIsRequesting] = useState(false)
   const [isApproving, setIsApproving] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -228,28 +229,32 @@ const [document, setDocument] = useState<Document | null>(null)
           setDocument(mapped)
           if (!isApprovedForCurrentUser) {
             setContent("")
+            isDirtyRef.current = false
           }
         }
 
         if (isApprovedForCurrentUser && derivedRequest && currentUserId) {
           const docDetail = await getDocument(target.id, derivedRequest.id, currentUserId)
           if (!cancelled) {
+            const latestContent = docDetail.data.document.content ?? ""
             setDocument((prev) =>
               prev
                 ? {
                     ...prev,
-                    content: docDetail.data.document.content ?? "",
+                    content: latestContent,
                     status: "unlocked" as DocumentStatus,
                     currentApprovals: prev.requiredApprovals,
                   }
                 : mapApiDocument(docDetail.data.document, participantLookup, {
-                    content: docDetail.data.document.content ?? "",
+                    content: latestContent,
                     status: "unlocked",
                     currentApprovals: docDetail.data.document.threshold,
                     requestId: derivedRequest.id,
                   })
             )
-            setContent(docDetail.data.document.content ?? "")
+            if (!isDirtyRef.current) {
+              setContent(latestContent)
+            }
           }
         }
 
@@ -435,6 +440,7 @@ const [document, setDocument] = useState<Document | null>(null)
 
   const handleContentChange = (newContent: string) => {
     setContent(newContent)
+    isDirtyRef.current = true
     if (document) {
       setDocument({
         ...document,
@@ -463,6 +469,7 @@ const [document, setDocument] = useState<Document | null>(null)
             }
           : prev
       )
+      isDirtyRef.current = false
       toast({
         title: "Edit saved",
         description: "Your changes have been saved.",
