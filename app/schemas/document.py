@@ -31,6 +31,5 @@ class DocumentRead(BaseModel):
     participants: list[UUID]
     created_at: datetime
     content: str | None = None
-    encryption_key: str | None = None
 
     model_config = {"from_attributes": True}

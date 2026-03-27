@@ -6,16 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_session
-from app.models import Document, DocumentParticipant, User
+from app.models import AccessRequest, Document, DocumentParticipant, RequestStatus, User
 from app.schemas import DocumentCreate, DocumentRead
-from app.utils import encryption_service
+from app.utils import encryption_service, key_sharing_service
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-def _to_schema(
-    document: Document, *, content: str | None = None, encryption_key: str | None = None
-) -> DocumentRead:
+def _to_schema(document: Document, *, content: str | None = None) -> DocumentRead:
     participant_ids = [participant.user_id for participant in document.participants]
     return DocumentRead(
         id=document.id,
@@ -25,7 +23,6 @@ def _to_schema(
         participants=participant_ids,
         created_at=document.created_at,
         content=content,
-        encryption_key=encryption_key,
     )
 
 
@@ -69,14 +66,21 @@ async def create_document(
     session.add(document)
     await session.flush()
 
-    session.add_all(
-        [
-            DocumentParticipant(document=document, user_id=participant_id)
-            for participant_id in participant_ids
-        ]
-    )
-
     encryption_key = encryption_service.generate_key()
+    shares = key_sharing_service.split_key(encryption_key, payload.threshold, len(participant_ids))
+
+    participant_rows = []
+    for (share_index, share_value), participant_id in zip(shares, participant_ids):
+        participant_rows.append(
+            DocumentParticipant(
+                document=document,
+                user_id=participant_id,
+                share_index=share_index,
+                key_share=share_value,
+            )
+        )
+    session.add_all(participant_rows)
+
     encrypted_payload = encryption_service.encrypt(payload.content, encryption_key)
     document.encrypted_content = encrypted_payload
 
@@ -84,7 +88,7 @@ async def create_document(
 
     await session.refresh(document, attribute_names=["participants"])
 
-    return _to_schema(document, content=payload.content, encryption_key=encryption_key)
+    return _to_schema(document, content=payload.content)
 
 
 @router.get("", response_model=list[DocumentRead])
@@ -103,7 +107,7 @@ async def list_documents(
 @router.get("/{document_id}", response_model=DocumentRead)
 async def get_document(
     document_id: uuid.UUID,
-    key: str = Query(..., description="Base64-encoded AES key"),
+    request_id: uuid.UUID = Query(..., description="Access request id with approvals"),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentRead:
     result = await session.execute(
@@ -118,8 +122,50 @@ async def get_document(
             detail="Document not found",
         )
 
+    access_request_result = await session.execute(
+        select(AccessRequest)
+        .options(selectinload(AccessRequest.approvals))
+        .where(AccessRequest.id == request_id)
+    )
+    access_request = access_request_result.scalars().first()
+    if not access_request or access_request.document_id != document_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Access request not found",
+        )
+
+    if len(access_request.approvals) < document.threshold or access_request.status != RequestStatus.approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough approvals to reconstruct key",
+        )
+
+    approver_ids = [approval.approver_id for approval in access_request.approvals]
+    if not approver_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No approvals available",
+        )
+
+    share_rows = await session.execute(
+        select(DocumentParticipant.share_index, DocumentParticipant.key_share)
+        .where(
+            DocumentParticipant.document_id == document_id,
+            DocumentParticipant.user_id.in_(approver_ids),
+        )
+    )
+    shares = sorted(share_rows.all(), key=lambda row: row[0])
+    if len(shares) < document.threshold:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient shares to reconstruct key",
+        )
+
     try:
-        content = encryption_service.decrypt(document.encrypted_content, key)
+        encryption_key = key_sharing_service.reconstruct_key(
+            [(share_index, share) for share_index, share in shares][: document.threshold]
+        )
+        content = encryption_service.decrypt(document.encrypted_content, encryption_key)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

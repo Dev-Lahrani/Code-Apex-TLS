@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, Index, UniqueConstraint
+from sqlalchemy import ForeignKey, Index, Integer, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,6 +13,7 @@ class DocumentParticipant(Base):
     __tablename__ = "document_participants"
     __table_args__ = (
         UniqueConstraint("document_id", "user_id", name="uq_document_participants_document_user"),
+        UniqueConstraint("document_id", "share_index", name="uq_document_participants_document_share_index"),
         Index("ix_document_participants_document_id", "document_id"),
         Index("ix_document_participants_user_id", "user_id"),
     )
@@ -27,6 +28,8 @@ class DocumentParticipant(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         primary_key=True,
     )
+    share_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    key_share: Mapped[str] = mapped_column(Text, nullable=False)
 
     document: Mapped["Document"] = relationship(back_populates="participants")
     user: Mapped["User"] = relationship(back_populates="document_participations")
