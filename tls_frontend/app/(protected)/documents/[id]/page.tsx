@@ -221,7 +221,9 @@ const [document, setDocument] = useState<Document | null>(null)
         })
         if (!cancelled) {
           setDocument(mapped)
-          setContent(mapped.content ?? "")
+          if (derivedRequest?.status !== "approved") {
+            setContent(mapped.content ?? "")
+          }
         }
 
         if (activeRequest?.status === "approved" && activeRequest.requester_id === currentUserId) {
