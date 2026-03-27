@@ -1,0 +1,14 @@
+.aider*
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+.idea/
+.vscode/
+dist/
+build/
+coverage/
