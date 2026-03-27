@@ -105,13 +105,17 @@ export function mapApiDocument(
 }
 
 export function mapApiLogs(entries: import("./api").ApiLogEntry[]): AuditLogEntry[] {
-  return entries.map((entry) => ({
-    id: entry.id,
-    action: entry.action,
-    timestamp: new Date(entry.timestamp),
-    hash: entry.hash,
-    verified: !!entry.tx_hash || !!entry.hash,
-    userId: entry.user_id,
-    details: entry.details,
-  }))
+  return [...entries]
+    .sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    )
+    .map((entry) => ({
+      id: entry.id,
+      action: entry.action,
+      timestamp: new Date(entry.timestamp),
+      hash: entry.hash ?? "—",
+      verified: !!entry.tx_hash || !!entry.hash,
+      userId: entry.user_id,
+      details: entry.details,
+    }))
 }

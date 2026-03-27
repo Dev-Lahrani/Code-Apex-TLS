@@ -12,6 +12,8 @@ interface AuditLogPanelProps {
 }
 
 export function AuditLogPanel({ entries }: AuditLogPanelProps) {
+  const hasEntries = entries.length > 0
+
   return (
     <Card className="h-fit">
       <CardHeader className="pb-3">
@@ -20,16 +22,16 @@ export function AuditLogPanel({ entries }: AuditLogPanelProps) {
       <CardContent className="p-0">
         <ScrollArea className="h-[400px]">
           <div className="space-y-0 px-4 pb-4">
+            {!hasEntries && (
+              <div className="py-6 text-sm text-muted-foreground text-center">
+                No activity yet.
+              </div>
+            )}
             {entries.map((entry, index) => (
-              <div
-                key={entry.id}
-                className="relative pl-4 pb-4 last:pb-0"
-              >
-                {/* Timeline line */}
+              <div key={entry.id} className="relative pl-4 pb-4 last:pb-0">
                 {index < entries.length - 1 && (
                   <div className="absolute left-[7px] top-3 h-full w-px bg-border" />
                 )}
-                {/* Timeline dot */}
                 <div className="absolute left-0 top-1.5 h-3.5 w-3.5 rounded-full border-2 border-border bg-background" />
                 
                 <div className="space-y-1">

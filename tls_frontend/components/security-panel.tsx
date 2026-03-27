@@ -1,11 +1,12 @@
 "use client"
 
-import { Shield, Lock, UserCheck, FileCheck } from "lucide-react"
+import { Shield, Lock, UserCheck, FileCheck, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Document } from "@/lib/document-store"
 
 interface SecurityPanelProps {
   document: Document
+  isSyncing?: boolean
 }
 
 const securityItems = [
@@ -14,13 +15,19 @@ const securityItems = [
   { label: "Audit", value: "Enabled", icon: FileCheck },
 ]
 
-export function SecurityPanel({ document }: SecurityPanelProps) {
+export function SecurityPanel({ document, isSyncing = false }: SecurityPanelProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Shield className="h-4 w-4" />
           Security
+          {isSyncing && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Syncing…
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>

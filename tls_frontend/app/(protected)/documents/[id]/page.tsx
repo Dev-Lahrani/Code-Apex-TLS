@@ -45,10 +45,11 @@ const ACCESS_REQUEST_TTL_MS =
 
 const [directory, setDirectory] = useState<UserDirectory>({})
 const [document, setDocument] = useState<Document | null>(null)
-const [content, setContent] = useState("")
-const [isRequesting, setIsRequesting] = useState(false)
-const [isApproving, setIsApproving] = useState<string | null>(null)
-const [isLoading, setIsLoading] = useState(true)
+  const [content, setContent] = useState("")
+  const [isRequesting, setIsRequesting] = useState(false)
+  const [isApproving, setIsApproving] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
   const [activeRequest, setActiveRequest] = useState<ApiAccessRequest | null>(null)
   const [missing, setMissing] = useState(false)
@@ -128,6 +129,8 @@ const [isLoading, setIsLoading] = useState(true)
       try {
         if (!isPoll) {
           setIsLoading(true)
+        } else {
+          setIsSyncing(true)
         }
 
         // Expire local cache proactively
@@ -268,6 +271,7 @@ const [isLoading, setIsLoading] = useState(true)
       } finally {
         if (!cancelled) {
           setIsLoading(false)
+          setIsSyncing(false)
         }
       }
     }
@@ -299,7 +303,7 @@ const [isLoading, setIsLoading] = useState(true)
           : prev
       )
       toast({
-        title: "Access requested",
+        title: "Request sent",
         description: "Waiting for participant approvals.",
       })
       // Persist created_at for TTL checks
@@ -348,7 +352,7 @@ const [isLoading, setIsLoading] = useState(true)
         })
       } else {
         toast({
-          title: "Approval received",
+          title: "Approval recorded",
           description: "Waiting for more approvals.",
         })
       }
@@ -394,7 +398,7 @@ const [isLoading, setIsLoading] = useState(true)
           : prev
       )
       toast({
-        title: "Document updated",
+        title: "Edit saved",
         description: "Your changes have been saved.",
       })
     } catch (error) {
@@ -429,7 +433,7 @@ const [isLoading, setIsLoading] = useState(true)
     <AppShell title="Document">
       <div className="space-y-4">
         {/* Security Panel */}
-        {document && <SecurityPanel document={document} />}
+        {document && <SecurityPanel document={document} isSyncing={isSyncing} />}
 
         {/* 3-Column Layout */}
         {document && (
