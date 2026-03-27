@@ -148,13 +148,23 @@ async def reconstruct_key_for_request(*, session: AsyncSession, access_request: 
     shares: Iterable[Tuple[int, str]] = sorted(
         {(row[0], row[1]) for row in share_rows.all()}, key=lambda row: row[0]
     )
-    if len(shares) < access_request.document.threshold:
+    total_participants = await session.scalar(
+        select(func.count()).select_from(DocumentParticipant).where(DocumentParticipant.document_id == access_request.document_id)
+    )
+    required = calculate_threshold(
+        threshold_type=access_request.document.threshold_type,
+        threshold_value=access_request.document.threshold_value,
+        fallback=access_request.document.threshold,
+        total_participants=total_participants or 0,
+    )
+    required_shares = min(required, len(shares), access_request.document.threshold)
+    if len(shares) < required_shares:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough approvals to reconstruct key",
         )
     return key_sharing_service.reconstruct_key(
-        list(shares)[: access_request.document.threshold]
+        list(shares)[:required_shares]
     )
 
 
