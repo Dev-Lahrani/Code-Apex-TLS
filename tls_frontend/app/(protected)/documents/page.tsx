@@ -183,13 +183,6 @@ export default function DocumentsPage() {
     }
   }
 
-  const handleDeleteUnavailable = () => {
-    toast({
-      title: "Delete unavailable",
-      description: "Document delete is not available yet.",
-    })
-  }
-
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
       const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -336,12 +329,6 @@ export default function DocumentsPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleCopyLink(doc.id)}>
                               Copy link
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={handleDeleteUnavailable}
-                            >
-                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

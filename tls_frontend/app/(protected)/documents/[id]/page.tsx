@@ -214,20 +214,25 @@ const [document, setDocument] = useState<Document | null>(null)
           setActiveRequest(null)
         }
 
+        const isApprovedForCurrentUser =
+          !!derivedRequest &&
+          derivedRequest.status === "approved" &&
+          derivedRequest.requester_id === currentUserId
+
         const mapped = mapApiDocument(target, participantLookup, {
           currentApprovals: derivedRequest?.status === "approved" ? target?.threshold ?? 0 : 0,
-          status: derivedRequest?.status === "approved" ? "unlocked" : derivedRequest ? "pending" : "locked",
+          status: isApprovedForCurrentUser ? "unlocked" : derivedRequest ? "pending" : "locked",
           requestId: derivedRequest?.id,
         })
         if (!cancelled) {
           setDocument(mapped)
-          if (derivedRequest?.status !== "approved") {
-            setContent(mapped.content ?? "")
+          if (!isApprovedForCurrentUser) {
+            setContent("")
           }
         }
 
-        if (activeRequest?.status === "approved" && activeRequest.requester_id === currentUserId) {
-          const docDetail = await getDocument(target!.id, activeRequest.id, currentUserId)
+        if (isApprovedForCurrentUser && derivedRequest && currentUserId) {
+          const docDetail = await getDocument(target.id, derivedRequest.id, currentUserId)
           if (!cancelled) {
             setDocument((prev) =>
               prev
@@ -241,7 +246,7 @@ const [document, setDocument] = useState<Document | null>(null)
                     content: docDetail.data.document.content ?? "",
                     status: "unlocked",
                     currentApprovals: docDetail.data.document.threshold,
-                    requestId: activeRequest.id,
+                    requestId: derivedRequest.id,
                   })
             )
             setContent(docDetail.data.document.content ?? "")
@@ -276,7 +281,10 @@ const [document, setDocument] = useState<Document | null>(null)
                   currentApprovals: thresholdMet
                     ? prev.requiredApprovals
                     : Math.min(approvalsCount, prev.requiredApprovals),
-                  status: thresholdMet ? "unlocked" : "pending",
+                  status:
+                    thresholdMet && derivedRequest.requester_id === currentUserId
+                      ? "unlocked"
+                      : "pending",
                   participants: prev.participants.map((p) => {
                     if (approvedUsers.has(p.id)) {
                       return { ...p, status: "approved" as const }
