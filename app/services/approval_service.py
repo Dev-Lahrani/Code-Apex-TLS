@@ -1,15 +1,36 @@
 from __future__ import annotations
 
 from typing import Iterable, Tuple
+import math
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import AccessRequest, Approval, DocumentParticipant, RequestStatus
+from app.models import AccessRequest, Approval, DocumentParticipant, RequestStatus, ThresholdType
 from app.services.logging_service import log_action
 from app.utils import key_sharing_service
+
+
+def calculate_threshold(*, threshold_type: ThresholdType, threshold_value: float | None, fallback: int, total_participants: int) -> int:
+    if total_participants <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No participants found")
+    if threshold_type == ThresholdType.percentage:
+        if threshold_value is None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="threshold_value required for percentage")
+        if not (0 < threshold_value <= 1):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="percentage must be between 0 and 1")
+        required = math.ceil(threshold_value * total_participants)
+    else:
+        # fixed or smart both use numeric value
+        base = threshold_value if threshold_value else fallback
+        required = int(base)
+    if required < 1:
+        required = 1
+    if required > total_participants:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="threshold cannot exceed participants")
+    return required
 
 
 async def approve_request(*, session: AsyncSession, request_id, approver_id) -> AccessRequest:
@@ -73,7 +94,34 @@ async def check_threshold(*, session: AsyncSession, access_request: AccessReques
     approvals_count = await session.scalar(
         select(func.count(Approval.id)).where(Approval.request_id == access_request.id)
     )
-    if approvals_count is None or approvals_count < access_request.document.threshold:
+    total_participants = await session.scalar(
+        select(func.count()).select_from(DocumentParticipant).where(DocumentParticipant.document_id == access_request.document_id)
+    )
+    required = calculate_threshold(
+        threshold_type=access_request.document.threshold_type,
+        threshold_value=access_request.document.threshold_value,
+        fallback=access_request.document.threshold,
+        total_participants=total_participants or 0,
+    )
+
+    await log_action(
+        session=session,
+        document_id=access_request.document_id,
+        user_id=access_request.requester_id,
+        action="Dynamic threshold calculated",
+        details=f"{required} required approvals",
+    )
+
+    approvals_for_count = approvals_count or 0
+    if access_request.document.threshold_type == ThresholdType.smart:
+        approver_rows = await session.execute(
+            select(Approval.approver_id).where(Approval.request_id == access_request.id)
+        )
+        approvals_for_count = 0
+        for (approver_id,) in approver_rows.all():
+            approvals_for_count += 2 if approver_id == access_request.document.owner_id else 1
+
+    if approvals_for_count < required:
         return False
 
     if access_request.status != RequestStatus.approved:

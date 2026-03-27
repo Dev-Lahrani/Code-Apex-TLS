@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import AccessRequest, Document, DocumentParticipant, RequestStatus, User
 from app.schemas import DocumentCreate, DocumentEdit
 from app.services.logging_service import log_action
+from app.services.approval_service import calculate_threshold
 from app.utils import encryption_service, key_sharing_service
 
 
@@ -18,11 +19,13 @@ async def create_document(
     payload: DocumentCreate,
 ) -> Document:
     participant_ids = list(dict.fromkeys(payload.participants))
-    if payload.threshold > len(participant_ids):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="threshold cannot exceed number of participants",
-        )
+    total_participants = len(participant_ids)
+    required_threshold = calculate_threshold(
+        threshold_type=payload.threshold_type,
+        threshold_value=payload.threshold_value,
+        fallback=payload.threshold,
+        total_participants=total_participants,
+    )
 
     # Validate owner and participants exist
     user_ids = set(participant_ids) | {payload.owner_id}
@@ -38,7 +41,9 @@ async def create_document(
     document = Document(
         title=payload.title,
         owner_id=payload.owner_id,
-        threshold=payload.threshold,
+        threshold=required_threshold,
+        threshold_type=payload.threshold_type,
+        threshold_value=payload.threshold_value if payload.threshold_value is not None else payload.threshold,
         encrypted_content="",
     )
     session.add(document)

@@ -1,13 +1,31 @@
 from __future__ import annotations
 
 import uuid
+import enum
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    Float,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+
+class ThresholdType(str, enum.Enum):
+    fixed = "fixed"
+    percentage = "percentage"
+    smart = "smart"
 
 
 class Document(Base):
@@ -31,6 +49,16 @@ class Document(Base):
         nullable=False,
     )
     threshold: Mapped[int] = mapped_column(Integer, nullable=False)
+    threshold_type: Mapped[ThresholdType] = mapped_column(
+        Enum(ThresholdType, name="threshold_type"),
+        nullable=False,
+        default=ThresholdType.fixed,
+        server_default=ThresholdType.fixed.value,
+    )
+    threshold_value: Mapped[float] = mapped_column(
+        Float,
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=func.now(),
