@@ -23,6 +23,43 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const AUTH_STORAGE_KEY = "zerotrust-auth"
+const PASSWORD_STORAGE_KEY = "zerotrust-auth-passwords"
+
+async function hashPassword(password: string): Promise<string> {
+  if (typeof window === "undefined" || !window.crypto?.subtle) {
+    throw new Error("Secure password hashing is unavailable in this environment")
+  }
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const hashBuffer = await window.crypto.subtle.digest("SHA-256", data)
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+}
+
+function loadPasswordStore(): Record<string, string> {
+  if (typeof window === "undefined") return {}
+  const raw = window.localStorage.getItem(PASSWORD_STORAGE_KEY)
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw) as Record<string, string>
+    return parsed && typeof parsed === "object" ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function savePasswordHash(email: string, hash: string) {
+  if (typeof window === "undefined") return
+  const store = loadPasswordStore()
+  store[email] = hash
+  window.localStorage.setItem(PASSWORD_STORAGE_KEY, JSON.stringify(store))
+}
+
+function getStoredPasswordHash(email: string): string | null {
+  const store = loadPasswordStore()
+  return store[email] ?? null
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -75,6 +112,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const normalizedEmail = email.toLowerCase()
+        const providedHash = await hashPassword(password)
+        const storedHash = getStoredPasswordHash(normalizedEmail)
+
+        if (!storedHash || storedHash !== providedHash) {
+          return { success: false, error: "Invalid email or password" }
+        }
+
         const name = normalizedEmail.split("@")[0].replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
         const backendUser = await ensureBackendUser(name)
 
@@ -115,8 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const normalizedEmail = email.toLowerCase()
+        const passwordHash = await hashPassword(password)
         const backendUser = await ensureBackendUser(name)
 
+        savePasswordHash(normalizedEmail, passwordHash)
         persistUser({
           id: backendUser.id,
           name: backendUser.name,
