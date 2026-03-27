@@ -40,12 +40,12 @@ services:
       context: ./tls_frontend
       dockerfile: Dockerfile.frontend
       args:
-        NEXT_PUBLIC_API_BASE_URL: "http://${PUBLIC_IP:-localhost}:8000"
+        NEXT_PUBLIC_API_BASE_URL: "http://165.22.222.56:8000"
     depends_on:
       backend:
         condition: service_started
     environment:
-      NEXT_PUBLIC_API_BASE_URL: "http://${PUBLIC_IP:-localhost}:8000"
+      NEXT_PUBLIC_API_BASE_URL: "http://165.22.222.56:8000"
       NODE_ENV: production
     ports:
       - "3000:3000"

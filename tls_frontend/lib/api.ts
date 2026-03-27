@@ -1,4 +1,8 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api"
+const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://165.22.222.56:8000").replace(
+  /\/+$/,
+  "",
+)
+const API_BASE_URL = `${baseUrl}/api`
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   try {
