@@ -12,3 +12,8 @@ __pycache__/
 dist/
 build/
 coverage/
+node_modules/
+.next/
+*.pyo
+venv/
+alembic/versions/__pycache__/
