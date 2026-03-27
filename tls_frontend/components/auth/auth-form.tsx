@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { toast } from '@/hooks/use-toast'
 import { validateEmail, validatePassword, validateName } from '@/lib/auth-utils'
 
 interface AuthFormProps {
@@ -49,14 +50,26 @@ export function AuthForm({ type }: AuthFormProps) {
 
     setIsSubmitting(true)
     try {
-      if (type === 'login') {
-        await login(formData.email, formData.password)
-      } else {
-        await signup(formData.name, formData.email, formData.password)
+      const result =
+        type === 'login'
+          ? await login(formData.email, formData.password)
+          : await signup(formData.name, formData.email, formData.password)
+
+      if (!result.success) {
+        toast({
+          title: type === 'login' ? 'Login failed' : 'Sign up failed',
+          description: result.error ?? 'Please try again.',
+          variant: 'destructive',
+        })
+        return
       }
       router.push('/')
     } catch (error) {
-      // Error is already shown via toast in AuthProvider
+      toast({
+        title: 'Something went wrong',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      })
     } finally {
       setIsSubmitting(false)
     }
