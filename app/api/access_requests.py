@@ -1,4 +1,6 @@
+import hashlib
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, func, select
@@ -15,6 +17,8 @@ from app.models import (
     RequestStatus,
 )
 from app.schemas import AccessRequestCreate, AccessRequestRead, ApprovalCreate
+from app.utils import blockchain_service
+from app.core.config import settings
 
 router = APIRouter(tags=["access"], prefix="")
 
@@ -61,6 +65,10 @@ async def request_access(
             detail="A pending access request already exists",
         )
 
+    now = datetime.utcnow()
+    action = "access_request_created"
+    hash_value = hashlib.sha256(f"{action}{now.isoformat()}".encode()).hexdigest()
+
     access_request = AccessRequest(
         document_id=payload.document_id,
         requester_id=payload.requester_id,
@@ -72,8 +80,9 @@ async def request_access(
     activity_log = ActivityLog(
         document_id=payload.document_id,
         user_id=payload.requester_id,
-        action="access_request_created",
-        hash=uuid.uuid4().hex,
+        action=action,
+        timestamp=now,
+        hash=hash_value,
         tx_hash=None,
         details=str(access_request.id),
     )
@@ -81,6 +90,17 @@ async def request_access(
 
     await session.commit()
     await session.refresh(access_request)
+
+    tx_hash = await blockchain_service.log_action(
+        document_id=access_request.document_id.int % (2**256),
+        user_address=settings.blockchain_sender_address or "0x0000000000000000000000000000000000000000",
+        action=action,
+        timestamp=now,
+        hash_hex=hash_value,
+    )
+    if tx_hash:
+        activity_log.tx_hash = tx_hash
+        await session.commit()
 
     return access_request
 
@@ -143,6 +163,10 @@ async def approve_request(
             detail="Approval already recorded",
         )
 
+    now = datetime.utcnow()
+    action = "access_request_approved"
+    hash_value = hashlib.sha256(f"{action}{now.isoformat()}".encode()).hexdigest()
+
     approval = Approval(
         request_id=payload.request_id,
         approver_id=payload.approver_id,
@@ -152,8 +176,9 @@ async def approve_request(
     activity_log = ActivityLog(
         document_id=access_request.document_id,
         user_id=payload.approver_id,
-        action="access_request_approved",
-        hash=uuid.uuid4().hex,
+        action=action,
+        timestamp=now,
+        hash=hash_value,
         tx_hash=None,
         details=str(payload.request_id),
     )
@@ -170,5 +195,16 @@ async def approve_request(
 
     await session.commit()
     await session.refresh(access_request)
+
+    tx_hash = await blockchain_service.log_action(
+        document_id=access_request.document_id.int % (2**256),
+        user_address=settings.blockchain_sender_address or "0x0000000000000000000000000000000000000000",
+        action=action,
+        timestamp=now,
+        hash_hex=hash_value,
+    )
+    if tx_hash:
+        activity_log.tx_hash = tx_hash
+        await session.commit()
 
     return access_request

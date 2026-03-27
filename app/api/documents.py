@@ -10,7 +10,8 @@ from sqlalchemy.orm import selectinload
 from app.db.session import get_session
 from app.models import AccessRequest, ActivityLog, Document, DocumentParticipant, RequestStatus, User
 from app.schemas import DocumentCreate, DocumentEdit, DocumentRead
-from app.utils import encryption_service, key_sharing_service
+from app.utils import blockchain_service, encryption_service, key_sharing_service
+from app.core.config import settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -256,14 +257,14 @@ async def edit_document(
     encrypted_payload = encryption_service.encrypt(new_content, encryption_key)
     document.encrypted_content = encrypted_payload
 
-    timestamp = datetime.utcnow().isoformat()
+    dt = datetime.utcnow()
     action = "document_edited"
-    hash_value = hashlib.sha256(f"{action}{timestamp}".encode()).hexdigest()
+    hash_value = hashlib.sha256(f"{action}{dt.isoformat()}".encode()).hexdigest()
     log_entry = ActivityLog(
         document_id=payload.document_id,
         user_id=payload.editor_id,
         action=action,
-        timestamp=datetime.fromisoformat(timestamp),
+        timestamp=dt,
         hash=hash_value,
         tx_hash=None,
         details=str(payload.request_id),
@@ -272,5 +273,16 @@ async def edit_document(
 
     await session.commit()
     await session.refresh(document, attribute_names=["participants"])
+
+    tx_hash = await blockchain_service.log_action(
+        document_id=payload.document_id.int % (2**256),
+        user_address=settings.blockchain_sender_address or "0x0000000000000000000000000000000000000000",
+        action=action,
+        timestamp=dt,
+        hash_hex=hash_value,
+    )
+    if tx_hash:
+        log_entry.tx_hash = tx_hash
+        await session.commit()
 
     return _to_schema(document, content=new_content)

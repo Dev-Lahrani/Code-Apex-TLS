@@ -18,6 +18,17 @@ class Settings(BaseSettings):
     redis_enabled: bool = Field(default=False, alias="REDIS_ENABLED")
     redis_url: str | None = Field(default=None, alias="REDIS_URL")
 
+    blockchain_enabled: bool = Field(default=False, alias="BLOCKCHAIN_ENABLED")
+    blockchain_rpc_url: str | None = Field(default=None, alias="BLOCKCHAIN_RPC_URL")
+    blockchain_private_key: str | None = Field(default=None, alias="BLOCKCHAIN_PRIVATE_KEY")
+    blockchain_contract_address: str | None = Field(
+        default=None, alias="BLOCKCHAIN_CONTRACT_ADDRESS"
+    )
+    blockchain_chain_id: int | None = Field(default=None, alias="BLOCKCHAIN_CHAIN_ID")
+    blockchain_sender_address: str | None = Field(
+        default=None, alias="BLOCKCHAIN_SENDER_ADDRESS"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
