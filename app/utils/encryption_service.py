@@ -1,7 +1,8 @@
 import base64
 
-from Cryptodome.Cipher import AES
-from Cryptodome.Random import get_random_bytes
+# Use the Crypto namespace provided by pycryptodome (installed via requirements.txt).
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 
 
 def generate_key() -> str:
@@ -35,12 +36,12 @@ def decrypt(token_b64: str, key_b64: str) -> str:
     except Exception as exc:
         raise ValueError("Invalid encrypted payload") from exc
 
-    if len(payload) < 28:  # 12 bytes nonce + 16 bytes tag
+    if len(payload) < 32:  # 16 bytes nonce + 16 bytes tag
         raise ValueError("Encrypted payload too short")
 
-    nonce = payload[:12]
-    tag = payload[12:28]
-    ciphertext = payload[28:]
+    nonce = payload[:16]
+    tag = payload[16:32]
+    ciphertext = payload[32:]
 
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     try:
