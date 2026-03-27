@@ -1,3 +1,4 @@
+from app.schemas.access_request import AccessRequestCreate, AccessRequestRead
 from app.schemas.document import DocumentBase, DocumentCreate, DocumentRead
 from app.schemas.user import UserBase, UserCreate, UserRead
 
@@ -8,4 +9,6 @@ __all__ = [
     "DocumentBase",
     "DocumentCreate",
     "DocumentRead",
+    "AccessRequestCreate",
+    "AccessRequestRead",
 ]
