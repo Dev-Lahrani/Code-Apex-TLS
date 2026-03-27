@@ -5,6 +5,7 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     Enum,
@@ -50,6 +51,9 @@ class Document(Base):
     )
     ipfs_cid: Mapped[str | None] = mapped_column(String(255), nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    is_flagged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    anomaly_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    anomaly_label: Mapped[str | None] = mapped_column(String(32), nullable=True)
     threshold: Mapped[int] = mapped_column(Integer, nullable=False)
     threshold_type: Mapped[ThresholdType] = mapped_column(
         Enum(ThresholdType, name="threshold_type"),

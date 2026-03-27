@@ -60,5 +60,8 @@ class DocumentRead(BaseModel):
     content: str | None = None
     ipfs_cid: str | None = None
     content_hash: str | None = None
+    is_flagged: bool | None = None
+    anomaly_score: float | None = None
+    anomaly_label: str | None = None
 
     model_config = {"from_attributes": True}

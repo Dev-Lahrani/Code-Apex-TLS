@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable
 import hashlib
+import logging
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -11,8 +12,11 @@ from app.models import AccessRequest, Document, DocumentParticipant, RequestStat
 from app.schemas import DocumentCreate, DocumentEdit
 from app.services.logging_service import log_action
 from app.services.ipfs_service import upload_to_ipfs
+from app.services.anomaly_service import analyze_edit
 from app.services.approval_service import calculate_threshold
 from app.utils import encryption_service, key_sharing_service
+
+logger = logging.getLogger(__name__)
 
 
 async def create_document(
@@ -119,6 +123,12 @@ async def edit_document(
 
     # Decrypt and re-encrypt with new content using provided key
     encryption_service.decrypt(document.encrypted_content, encryption_key)  # validates key
+
+    anomaly = await analyze_edit(payload.content)
+    risk_score = float(anomaly.get("risk_score", 0.0))
+    label = str(anomaly.get("label", "safe")).lower()
+    is_suspicious = label == "suspicious" or risk_score >= 0.7
+
     encrypted_content = encryption_service.encrypt(payload.content, encryption_key)
     content_hash = hashlib.sha256(encrypted_content.encode()).hexdigest()
     cid = await upload_to_ipfs(
@@ -131,6 +141,19 @@ async def edit_document(
     document.encrypted_content = encrypted_content
     document.content_hash = content_hash
     document.ipfs_cid = cid
+    document.anomaly_score = risk_score
+    document.anomaly_label = label
+    document.is_flagged = is_suspicious
+
+    if is_suspicious:
+        logger.warning("Anomaly detected for document %s with score %.2f", document.id, risk_score)
+        await log_action(
+            session=session,
+            document_id=document.id,
+            user_id=payload.editor_id,
+            action="Anomaly detected",
+            details=f"{label}:{risk_score:.2f}",
+        )
 
     await log_action(
         session=session,
