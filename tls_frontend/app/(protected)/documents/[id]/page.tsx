@@ -221,7 +221,7 @@ const [document, setDocument] = useState<Document | null>(null)
         })
         if (!cancelled) {
           setDocument(mapped)
-          setContent((prev) => (prev ? prev : mapped.content))
+          setContent(mapped.content ?? "")
         }
 
         if (activeRequest?.status === "approved" && activeRequest.requester_id === currentUserId) {

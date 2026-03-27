@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Lock, Unlock, Shield, Save } from "lucide-react"
+import { useRef, useState, type ChangeEvent } from "react"
+import { Lock, Unlock, Shield, Save, Paperclip } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Spinner } from "@/components/ui/spinner"
 import type { Document, DocumentStatus } from "@/lib/document-store"
+import { toast } from "@/hooks/use-toast"
 
 const statusConfig: Record<DocumentStatus, { label: string; icon: typeof Lock; className: string }> = {
   locked: {
@@ -35,6 +36,13 @@ interface DocumentEditorPanelProps {
   onSave?: () => Promise<void>
 }
 
+const TEXT_FILE_EXTENSIONS = new Set([
+  "txt", "md", "js", "ts", "jsx", "tsx", "py", "java", "c", "cpp", "cs", "go", "rs", "rb", "php",
+  "html", "css", "json", "xml", "yaml", "yml", "sh", "sql", "csv",
+])
+
+const BINARY_FILE_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx"])
+
 export function DocumentEditorPanel({
   document,
   content,
@@ -42,6 +50,7 @@ export function DocumentEditorPanel({
   onSave,
 }: DocumentEditorPanelProps) {
   const [isSaving, setIsSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const status = statusConfig[document.status]
   const StatusIcon = status.icon
   const isLocked = document.status !== "unlocked"
@@ -56,12 +65,97 @@ export function DocumentEditorPanel({
     }
   }
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() ?? "" : ""
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      try {
+        if (BINARY_FILE_EXTENSIONS.has(extension)) {
+          onContentChange(
+            `[Uploaded file: ${file.name} - binary file content cannot be displayed as text]`
+          )
+        } else if (TEXT_FILE_EXTENSIONS.has(extension)) {
+          const result = typeof reader.result === "string" ? reader.result : ""
+          onContentChange(result)
+        } else {
+          throw new Error("Unsupported file type")
+        }
+
+        toast({
+          title: "File loaded",
+          description: `${file.name} has been inserted into the document.`,
+        })
+      } catch {
+        toast({
+          title: "Upload failed",
+          description: "Could not read file.",
+          variant: "destructive",
+        })
+      } finally {
+        event.target.value = ""
+      }
+    }
+
+    reader.onerror = () => {
+      toast({
+        title: "Upload failed",
+        description: "Could not read file.",
+        variant: "destructive",
+      })
+      event.target.value = ""
+    }
+
+    if (TEXT_FILE_EXTENSIONS.has(extension)) {
+      reader.readAsText(file)
+      return
+    }
+    if (BINARY_FILE_EXTENSIONS.has(extension)) {
+      reader.readAsArrayBuffer(file)
+      return
+    }
+
+    toast({
+      title: "Upload failed",
+      description: "Could not read file.",
+      variant: "destructive",
+    })
+    event.target.value = ""
+  }
+
   return (
     <Card className="flex flex-col h-full">
       <CardHeader className="pb-3 border-b border-border">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base font-medium truncate">{document.title}</CardTitle>
           <div className="flex items-center gap-2 shrink-0">
+            {!isLocked && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".txt,.md,.js,.ts,.jsx,.tsx,.py,.java,.c,.cpp,.cs,.go,.rs,.rb,.php,.html,.css,.json,.xml,.yaml,.yml,.sh,.sql,.pdf,.doc,.docx,.xls,.xlsx,.csv"
+                  onChange={handleFileChange}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 h-7 text-xs"
+                  onClick={handleUploadClick}
+                >
+                  <Paperclip className="h-3 w-3" />
+                  Upload File
+                </Button>
+              </>
+            )}
             {!isLocked && onSave && (
               <Button
                 size="sm"
