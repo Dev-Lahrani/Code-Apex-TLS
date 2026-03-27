@@ -137,15 +137,15 @@ const [isLoading, setIsLoading] = useState(true)
           setMissing(false)
         }
 
-        const mapped = mapApiDocument(target, participantLookup, {
-          currentApprovals: activeRequest?.status === "approved" ? target?.threshold ?? 0 : 0,
-          status: activeRequest?.status === "approved" ? "unlocked" : activeRequest ? "pending" : "locked",
-          requestId: activeRequest?.id,
-        })
-        if (!cancelled) {
-          setDocument(mapped)
-          setContent((prev) => (prev ? prev : mapped.content))
-        }
+          const mapped = mapApiDocument(target, participantLookup, {
+            currentApprovals: activeRequest?.status === "approved" ? target?.threshold ?? 0 : 0,
+            status: activeRequest?.status === "approved" ? "unlocked" : activeRequest ? "pending" : "locked",
+            requestId: activeRequest?.id,
+          })
+          if (!cancelled) {
+            setDocument(mapped)
+            setContent((prev) => (prev ? prev : mapped.content))
+          }
 
         if (activeRequest?.status === "approved" && activeRequest.requester_id === currentUserId) {
           const docDetail = await getDocument(target!.id, activeRequest.id, currentUserId)
@@ -185,12 +185,12 @@ const [isLoading, setIsLoading] = useState(true)
                 .map((entry) => entry.userId)
                 .filter((val): val is string => !!val)
             )
-            const approvalsCount = approvedUsers.size
-            const thresholdMet =
-              activeRequest.status === "approved" ||
-              approvalsCount >= mapped.requiredApprovals ||
-              mappedLogs.some(
-                (entry) =>
+             const approvalsCount = approvedUsers.size
+             const thresholdMet =
+               activeRequest.status === "approved" ||
+               approvalsCount >= mapped.requiredApprovals ||
+               mappedLogs.some(
+                 (entry) =>
                   entry.details === activeRequest.id &&
                   entry.action.toLowerCase().includes("threshold met")
               )
@@ -199,7 +199,9 @@ const [isLoading, setIsLoading] = useState(true)
               prev
                 ? {
                     ...prev,
-                    currentApprovals: thresholdMet ? prev.requiredApprovals : approvalsCount,
+                    currentApprovals: thresholdMet
+                      ? prev.requiredApprovals
+                      : Math.min(approvalsCount, prev.requiredApprovals),
                     status: thresholdMet ? "unlocked" : "pending",
                     participants: prev.participants.map((p) => {
                       if (approvedUsers.has(p.id)) {
@@ -221,6 +223,19 @@ const [isLoading, setIsLoading] = useState(true)
         }
       } catch (error) {
         if (!cancelled) {
+          if (error instanceof Error && error.message.toLowerCase().includes("expired")) {
+            setActiveRequest(null)
+            setDocument((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    status: "locked",
+                    currentApprovals: 0,
+                    participants: prev.participants.map((p) => ({ ...p, status: "not-requested" as const })),
+                  }
+                : prev
+            )
+          }
           toast({
             title: "Unable to load document",
             description: error instanceof Error ? error.message : "Please try again.",
@@ -290,7 +305,7 @@ const [isLoading, setIsLoading] = useState(true)
               currentApprovals:
                 response.data.request.status === "approved"
                   ? prev.requiredApprovals
-                  : prev.currentApprovals + 1,
+                  : Math.min(prev.currentApprovals + 1, prev.requiredApprovals),
               status: response.data.request.status === "approved" ? "unlocked" : "pending",
               participants: prev.participants.map((p) =>
                 p.id === participantId ? { ...p, status: "approved" as const } : p

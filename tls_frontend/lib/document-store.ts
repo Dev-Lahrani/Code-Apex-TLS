@@ -32,16 +32,47 @@ export interface Document {
   auditLog: AuditLogEntry[]
   lastUpdated: Date
   requestId?: string
+  thresholdType: "fixed" | "percentage" | "smart"
+  thresholdValue?: number | null
 }
 
 export type UserDirectory = Record<string, { name: string }>
+
+function computeRequiredApprovals(
+  participantsCount: number,
+  thresholdType: "fixed" | "percentage" | "smart",
+  threshold: number,
+  thresholdValue?: number | null
+): number {
+  const safeParticipants = Math.max(participantsCount, 0)
+  let required = threshold
+
+  if (thresholdType === "percentage") {
+    if (thresholdValue && thresholdValue > 0 && thresholdValue <= 1) {
+      required = Math.ceil(thresholdValue * safeParticipants)
+    }
+  } else if (thresholdValue && thresholdValue > 0) {
+    required = thresholdValue
+  }
+
+  if (required < 1) required = 1
+  if (safeParticipants > 0) {
+    required = Math.min(required, safeParticipants)
+  }
+  return required
+}
 
 export function mapApiDocument(
   apiDoc: import("./api").ApiDocument,
   users: UserDirectory,
   overrides?: Partial<Pick<Document, "currentApprovals" | "status" | "content" | "requestId">>
 ): Document {
-  const requiredApprovals = apiDoc.threshold_value ?? apiDoc.threshold
+  const requiredApprovals = computeRequiredApprovals(
+    apiDoc.participants.length,
+    apiDoc.threshold_type as Document["thresholdType"],
+    apiDoc.threshold,
+    apiDoc.threshold_value ?? undefined
+  )
   const currentApprovals = overrides?.currentApprovals ?? 0
   const status: DocumentStatus =
     overrides?.status ??
@@ -68,6 +99,8 @@ export function mapApiDocument(
     auditLog: [],
     lastUpdated: new Date(apiDoc.created_at),
     requestId: overrides?.requestId,
+    thresholdType: apiDoc.threshold_type as Document["thresholdType"],
+    thresholdValue: apiDoc.threshold_value ?? undefined,
   }
 }
 

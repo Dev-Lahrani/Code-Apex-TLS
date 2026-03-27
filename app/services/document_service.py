@@ -36,7 +36,7 @@ async def create_document(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"User(s) not found: {', '.join(str(mid) for mid in missing)}",
-        )
+    )
 
     document = Document(
         title=payload.title,
@@ -50,7 +50,7 @@ async def create_document(
     await session.flush()
 
     encryption_key = encryption_service.generate_key()
-    shares = key_sharing_service.split_key(encryption_key, payload.threshold, len(participant_ids))
+    shares = key_sharing_service.split_key(encryption_key, required_threshold, len(participant_ids))
 
     participants: Iterable[DocumentParticipant] = (
         DocumentParticipant(

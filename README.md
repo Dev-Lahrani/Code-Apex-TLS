@@ -36,7 +36,7 @@ Docs are served at `/docs` and `/redoc`.
 ## Frontend setup
 1) `cd tls_frontend`
 2) `pnpm install`
-3) `pnpm dev` (default API base: `http://localhost:8000/api` in `lib/api.ts`; adjust if the backend runs elsewhere)
+3) `pnpm dev` (default API base: `http://localhost:8000/api`; override with `NEXT_PUBLIC_API_BASE_URL`)
 
 ## Core concepts
 - Users own documents and can be participants.
@@ -56,6 +56,7 @@ Docs are served at `/docs` and `/redoc`.
 - Required: `DATABASE_URL` (e.g., `postgresql+asyncpg://user:pass@localhost:5432/codeapex`)
 - Optional: `REDIS_ENABLED`, `REDIS_URL`
 - Optional blockchain: `BLOCKCHAIN_ENABLED`, `BLOCKCHAIN_RPC_URL`, `BLOCKCHAIN_PRIVATE_KEY`, `BLOCKCHAIN_CONTRACT_ADDRESS`, `BLOCKCHAIN_CHAIN_ID`, `BLOCKCHAIN_SENDER_ADDRESS`
+- Access TTL (default 1h): `ACCESS_REQUEST_TTL_SECONDS`
 
 ## Smart contract
 `contracts/ActionLogger.sol` exposes `logAction` and an `ActionLogged` event for on-chain auditability when blockchain logging is enabled.

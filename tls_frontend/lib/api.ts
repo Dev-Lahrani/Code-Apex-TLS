@@ -1,22 +1,29 @@
-const API_BASE_URL = "http://localhost:8000/api"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api"
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    ...init,
-  })
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers || {}),
+      },
+      ...init,
+    })
 
-  const data = await response.json().catch(() => null)
+    const data = await response.json().catch(() => null)
 
-  if (!response.ok) {
-    const message = data?.detail || data?.message || "Request failed"
-    throw new Error(typeof message === "string" ? message : "Request failed")
+    if (!response.ok) {
+      const message = data?.detail || data?.message || "Request failed"
+      throw new Error(typeof message === "string" ? message : "Request failed")
+    }
+
+    return data as T
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error("Request failed")
   }
-
-  return data as T
 }
 
 export interface ApiDocument {

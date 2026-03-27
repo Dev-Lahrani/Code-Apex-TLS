@@ -41,7 +41,7 @@ export function AccessControlPanel({
   document,
   onRequestAccess,
   onApprove,
-  currentUserId = "p2",
+  currentUserId,
   requesterId,
   isRequesting = false,
   isApproving = null,

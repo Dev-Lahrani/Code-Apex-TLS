@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     blockchain_sender_address: str | None = Field(
         default=None, alias="BLOCKCHAIN_SENDER_ADDRESS"
     )
+    access_request_ttl_seconds: int = Field(default=60 * 60, alias="ACCESS_REQUEST_TTL_SECONDS")
 
     model_config = SettingsConfigDict(
         env_file=".env",

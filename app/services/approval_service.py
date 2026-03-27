@@ -2,15 +2,20 @@ from __future__ import annotations
 
 from typing import Iterable, Tuple
 import math
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.models import AccessRequest, Approval, DocumentParticipant, RequestStatus, ThresholdType
 from app.services.logging_service import log_action
 from app.utils import key_sharing_service
+
+
+ACCESS_REQUEST_TTL_SECONDS = settings.access_request_ttl_seconds
 
 
 def calculate_threshold(*, threshold_type: ThresholdType, threshold_value: float | None, fallback: int, total_participants: int) -> int:
@@ -33,6 +38,27 @@ def calculate_threshold(*, threshold_type: ThresholdType, threshold_value: float
     return required
 
 
+async def _ensure_not_expired(session: AsyncSession, access_request: AccessRequest) -> None:
+    now = datetime.now(timezone.utc)
+    # created_at is stored with timezone; use safe comparison
+    age_seconds = (now - access_request.created_at).total_seconds()
+    if age_seconds > ACCESS_REQUEST_TTL_SECONDS:
+        if access_request.status != RequestStatus.denied:
+            access_request.status = RequestStatus.denied
+            await log_action(
+                session=session,
+                document_id=access_request.document_id,
+                user_id=access_request.requester_id,
+                action="Access request expired",
+                details=str(access_request.id),
+            )
+            await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access request expired",
+        )
+
+
 async def approve_request(*, session: AsyncSession, request_id, approver_id) -> AccessRequest:
     access_request_result = await session.execute(
         select(AccessRequest)
@@ -42,6 +68,8 @@ async def approve_request(*, session: AsyncSession, request_id, approver_id) -> 
     access_request = access_request_result.scalars().first()
     if not access_request:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access request not found")
+
+    await _ensure_not_expired(session, access_request)
 
     if access_request.status != RequestStatus.pending:
         raise HTTPException(
@@ -93,10 +121,10 @@ async def approve_request(*, session: AsyncSession, request_id, approver_id) -> 
 async def check_threshold(*, session: AsyncSession, access_request: AccessRequest) -> bool:
     approvals_count = await session.scalar(
         select(func.count(Approval.id)).where(Approval.request_id == access_request.id)
-    )
+    ) or 0
     total_participants = await session.scalar(
         select(func.count()).select_from(DocumentParticipant).where(DocumentParticipant.document_id == access_request.document_id)
-    )
+    ) or 0
     required = calculate_threshold(
         threshold_type=access_request.document.threshold_type,
         threshold_value=access_request.document.threshold_value,
@@ -112,16 +140,7 @@ async def check_threshold(*, session: AsyncSession, access_request: AccessReques
         details=f"{required} required approvals",
     )
 
-    approvals_for_count = approvals_count or 0
-    if access_request.document.threshold_type == ThresholdType.smart:
-        approver_rows = await session.execute(
-            select(Approval.approver_id).where(Approval.request_id == access_request.id)
-        )
-        approvals_for_count = 0
-        for (approver_id,) in approver_rows.all():
-            approvals_for_count += 2 if approver_id == access_request.document.owner_id else 1
-
-    if approvals_for_count < required:
+    if approvals_count < required:
         return False
 
     if access_request.status != RequestStatus.approved:
@@ -169,6 +188,7 @@ async def reconstruct_key_for_request(*, session: AsyncSession, access_request: 
 
 
 async def grant_access(*, session: AsyncSession, access_request: AccessRequest) -> str:
+    await _ensure_not_expired(session, access_request)
     if access_request.status != RequestStatus.approved:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access not granted")
     return await reconstruct_key_for_request(session=session, access_request=access_request)
