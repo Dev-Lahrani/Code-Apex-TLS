@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
 import { Lock, Unlock, Clock, MoreHorizontal, FileText, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -56,6 +57,7 @@ const statusConfig: Record<DocumentStatus, { label: string; icon: typeof Lock; c
 }
 
 export default function DocumentsPage() {
+  const router = useRouter()
   const { user } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
   const [userDirectory, setUserDirectory] = useState<UserDirectory>({})
@@ -149,11 +151,42 @@ export default function DocumentsPage() {
     )
   }
 
-  const handleCopyLink = (docId: string) => {
-    navigator.clipboard.writeText(`${window.location.origin}/documents/${docId}`)
+  const handleCopyLink = async (docId: string) => {
+    const link = `${window.location.origin}/documents/${docId}`
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link)
+      } else {
+        const input = document.createElement("textarea")
+        input.value = link
+        input.style.position = "fixed"
+        input.style.left = "-9999px"
+        document.body.appendChild(input)
+        input.focus()
+        input.select()
+        const copied = document.execCommand("copy")
+        document.body.removeChild(input)
+        if (!copied) {
+          throw new Error("Copy command failed")
+        }
+      }
+      toast({
+        title: "Link copied",
+        description: "Document link has been copied to clipboard.",
+      })
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Could not copy link. Please copy it from the browser address bar.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteUnavailable = () => {
     toast({
-      title: "Link copied",
-      description: "Document link has been copied to clipboard.",
+      title: "Delete unavailable",
+      description: "Document delete is not available yet.",
     })
   }
 
@@ -298,13 +331,18 @@ export default function DocumentsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/documents/${doc.id}`}>View document</Link>
+                            <DropdownMenuItem onClick={() => router.push(`/documents/${doc.id}`)}>
+                              View document
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleCopyLink(doc.id)}>
                               Copy link
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={handleDeleteUnavailable}
+                            >
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
