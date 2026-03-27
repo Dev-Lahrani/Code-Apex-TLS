@@ -1,0 +1,16 @@
+.git
+__pycache__
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+*.swp
+.env
+.env.*
+.venv
+venv
+dist
+build
+node_modules
+.next
+tls_frontend
