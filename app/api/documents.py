@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -8,11 +8,14 @@ from sqlalchemy.orm import selectinload
 from app.db.session import get_session
 from app.models import Document, DocumentParticipant, User
 from app.schemas import DocumentCreate, DocumentRead
+from app.utils import encryption_service
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-def _to_schema(document: Document, encryption_key: str | None = None) -> DocumentRead:
+def _to_schema(
+    document: Document, *, content: str | None = None, encryption_key: str | None = None
+) -> DocumentRead:
     participant_ids = [participant.user_id for participant in document.participants]
     return DocumentRead(
         id=document.id,
@@ -21,6 +24,7 @@ def _to_schema(document: Document, encryption_key: str | None = None) -> Documen
         threshold=document.threshold,
         participants=participant_ids,
         created_at=document.created_at,
+        content=content,
         encryption_key=encryption_key,
     )
 
@@ -72,12 +76,15 @@ async def create_document(
         ]
     )
 
-    encryption_key = uuid.uuid4().hex
+    encryption_key = encryption_service.generate_key()
+    encrypted_payload = encryption_service.encrypt(payload.content, encryption_key)
+    document.encrypted_content = encrypted_payload
+
     await session.commit()
 
     await session.refresh(document, attribute_names=["participants"])
 
-    return _to_schema(document, encryption_key=encryption_key)
+    return _to_schema(document, content=payload.content, encryption_key=encryption_key)
 
 
 @router.get("", response_model=list[DocumentRead])
@@ -96,6 +103,7 @@ async def list_documents(
 @router.get("/{document_id}", response_model=DocumentRead)
 async def get_document(
     document_id: uuid.UUID,
+    key: str = Query(..., description="Base64-encoded AES key"),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentRead:
     result = await session.execute(
@@ -109,4 +117,13 @@ async def get_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
         )
-    return _to_schema(document)
+
+    try:
+        content = encryption_service.decrypt(document.encrypted_content, key)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    return _to_schema(document, content=content)

@@ -9,6 +9,7 @@ class DocumentBase(BaseModel):
     owner_id: UUID
     participants: list[UUID] = Field(default_factory=list)
     threshold: int = Field(..., gt=0)
+    content: str = Field("", min_length=0)
 
     @model_validator(mode="after")
     def validate_threshold(self) -> "DocumentBase":
@@ -29,6 +30,7 @@ class DocumentRead(BaseModel):
     threshold: int
     participants: list[UUID]
     created_at: datetime
+    content: str | None = None
     encryption_key: str | None = None
 
     model_config = {"from_attributes": True}

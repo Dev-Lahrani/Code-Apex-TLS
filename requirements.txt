@@ -7,3 +7,4 @@ pydantic==2.8.2
 pydantic-settings==2.3.4
 python-dotenv==1.0.1
 redis==5.0.4
+pycryptodome==3.21.0
