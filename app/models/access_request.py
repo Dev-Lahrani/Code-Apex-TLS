@@ -48,7 +48,7 @@ class AccessRequest(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=func.now(),
         server_default=func.now(),
         nullable=False,
     )

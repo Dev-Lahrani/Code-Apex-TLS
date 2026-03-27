@@ -38,7 +38,7 @@ class ActivityLog(Base):
     action: Mapped[str] = mapped_column(String(255), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=func.now(),
         server_default=func.now(),
         nullable=False,
     )

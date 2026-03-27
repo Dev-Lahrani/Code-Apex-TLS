@@ -33,7 +33,7 @@ class Document(Base):
     threshold: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=func.now(),
         server_default=func.now(),
         nullable=False,
     )

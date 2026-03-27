@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, Index
+from sqlalchemy import ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,6 +12,7 @@ from app.db.base import Base
 class Approval(Base):
     __tablename__ = "approvals"
     __table_args__ = (
+        UniqueConstraint("request_id", "approver_id", name="uq_approvals_request_approver"),
         Index("ix_approvals_request_id", "request_id"),
         Index("ix_approvals_approver_id", "approver_id"),
     )
