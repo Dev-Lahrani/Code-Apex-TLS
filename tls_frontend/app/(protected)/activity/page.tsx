@@ -1,14 +1,17 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { CheckCircle2, FileText, Lock, Unlock, UserPlus } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Spinner } from "@/components/ui/spinner"
+import { useAuth } from "@/lib/auth-context"
+import { getDocuments, getLogs, getUsers } from "@/lib/api"
 
-// Activity data - to be populated from backend API
-const activities: Array<{
+type ActivityItem = {
   id: string
   type: string
   icon: typeof CheckCircle2
@@ -17,9 +20,116 @@ const activities: Array<{
   document: string
   timestamp: Date
   hash: string
-}> = []
+}
+
+function getInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("")
+}
+
+function getActivityMeta(action: string): Pick<ActivityItem, "icon" | "type"> {
+  const normalizedAction = action.toLowerCase()
+
+  if (normalizedAction.includes("approved")) {
+    return { icon: CheckCircle2, type: "approved" }
+  }
+  if (normalizedAction.includes("requested")) {
+    return { icon: Lock, type: "requested" }
+  }
+  if (normalizedAction.includes("created")) {
+    return { icon: FileText, type: "created" }
+  }
+  if (normalizedAction.includes("granted") || normalizedAction.includes("unlocked")) {
+    return { icon: Unlock, type: "granted" }
+  }
+  return { icon: UserPlus, type: "activity" }
+}
 
 export default function ActivityPage() {
+  const { user } = useAuth()
+  const [activities, setActivities] = useState<ActivityItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadActivities = async () => {
+      if (!user?.id) {
+        if (!cancelled) {
+          setActivities([])
+          setIsLoading(false)
+        }
+        return
+      }
+
+      try {
+        setIsLoading(true)
+
+        const currentUserId = user.id
+        const [documentsResponse, users] = await Promise.all([getDocuments(currentUserId), getUsers()])
+        const documents = documentsResponse.data.documents
+        const userMap = users.reduce<Record<string, string>>((acc, item) => {
+          acc[item.id] = item.name
+          return acc
+        }, {})
+
+        const logsPerDocument = await Promise.all(
+          documents.map(async (document) => {
+            const logsResponse = await getLogs(document.id, currentUserId)
+            return logsResponse.data.logs.map((log) => ({ log, documentTitle: document.title }))
+          })
+        )
+
+        const merged = logsPerDocument
+          .flat()
+          .sort((a, b) => new Date(b.log.timestamp).getTime() - new Date(a.log.timestamp).getTime())
+          .map(({ log, documentTitle }) => {
+            const actorName = log.user_id ? userMap[log.user_id] ?? "System" : "System"
+            const meta = getActivityMeta(log.action)
+
+            return {
+              id: log.id,
+              action: log.action,
+              document: documentTitle,
+              timestamp: new Date(log.timestamp),
+              hash: log.hash ? `${log.hash.slice(0, 12)}...` : "N/A",
+              user: {
+                name: actorName,
+                avatar: "",
+                initials: getInitials(actorName),
+              },
+              icon: meta.icon,
+              type: meta.type,
+            }
+          })
+
+        if (!cancelled) {
+          setActivities(merged)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error(error)
+          setActivities([])
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadActivities()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
   return (
     <AppShell title="Activity">
       <div className="space-y-6">
@@ -36,7 +146,14 @@ export default function ActivityPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-0">
-              {activities.map((activity, index) => {
+              {isLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Spinner className="h-4 w-4" />
+                </div>
+              ) : activities.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No activity yet.</p>
+              ) : (
+                activities.map((activity, index) => {
                 const Icon = activity.icon
                 return (
                   <div
@@ -85,7 +202,8 @@ export default function ActivityPage() {
                     </div>
                   </div>
                 )
-              })}
+                })
+              )}
             </div>
           </CardContent>
         </Card>
