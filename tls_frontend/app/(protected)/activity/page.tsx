@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { CheckCircle2, FileText, Lock, Unlock, UserPlus } from "lucide-react"
+import { motion } from "framer-motion"
 import { AppShell } from "@/components/app-shell"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import { getDocuments, getLogs, getUsers } from "@/lib/api"
 
@@ -54,6 +56,7 @@ export default function ActivityPage() {
   const { user } = useAuth()
   const [activities, setActivities] = useState<ActivityItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [filter, setFilter] = useState<"all" | "approved" | "requested" | "other">("all")
 
   useEffect(() => {
     let cancelled = false
@@ -130,9 +133,24 @@ export default function ActivityPage() {
     }
   }, [user?.id])
 
+  const totalEvents = activities.length
+  const approvals = activities.filter((a) => a.type === "approved").length
+  const accessRequests = activities.filter((a) => a.type === "requested").length
+  const filteredActivities = activities.filter((activity) => {
+    if (filter === "all") return true
+    if (filter === "other") return !["approved", "requested"].includes(activity.type)
+    return activity.type === filter
+  })
+  const getTone = (type: string) => {
+    if (type === "approved") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+    if (type === "requested") return "border-sky-500/30 bg-sky-500/10 text-sky-600"
+    if (type === "created") return "border-amber-500/30 bg-amber-500/10 text-amber-600"
+    return "border-border bg-muted text-muted-foreground"
+  }
+
   return (
     <AppShell title="Activity">
-      <div className="space-y-6">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-foreground">Activity Feed</h2>
           <p className="text-sm text-muted-foreground mt-1">
@@ -140,7 +158,35 @@ export default function ActivityPage() {
           </p>
         </div>
 
-        <Card>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card className="ring-1 ring-border">
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Total Events</p>
+              <p className="mt-2 text-2xl font-semibold">{totalEvents}</p>
+            </CardContent>
+          </Card>
+          <Card className="ring-1 ring-border">
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Approvals</p>
+              <p className="mt-2 text-2xl font-semibold">{approvals}</p>
+            </CardContent>
+          </Card>
+          <Card className="ring-1 ring-border">
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Access Requests</p>
+              <p className="mt-2 text-2xl font-semibold">{accessRequests}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant={filter === "all" ? "default" : "outline"} onClick={() => setFilter("all")}>All</Button>
+          <Button size="sm" variant={filter === "approved" ? "default" : "outline"} onClick={() => setFilter("approved")}>Approvals</Button>
+          <Button size="sm" variant={filter === "requested" ? "default" : "outline"} onClick={() => setFilter("requested")}>Requests</Button>
+          <Button size="sm" variant={filter === "other" ? "default" : "outline"} onClick={() => setFilter("other")}>Other</Button>
+        </div>
+
+        <Card className="ring-1 ring-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
           </CardHeader>
@@ -150,10 +196,10 @@ export default function ActivityPage() {
                 <div className="flex items-center justify-center py-6">
                   <Spinner className="h-4 w-4" />
                 </div>
-              ) : activities.length === 0 ? (
+              ) : filteredActivities.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No activity yet.</p>
               ) : (
-                activities.map((activity, index) => {
+                filteredActivities.map((activity, index) => {
                 const Icon = activity.icon
                 return (
                   <div
@@ -161,12 +207,12 @@ export default function ActivityPage() {
                     className="relative pl-8 pb-6 last:pb-0"
                   >
                     {/* Timeline line */}
-                    {index < activities.length - 1 && (
+                    {index < filteredActivities.length - 1 && (
                       <div className="absolute left-[15px] top-8 h-full w-px bg-border" />
                     )}
                     {/* Timeline icon */}
-                    <div className="absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background">
-                      <Icon className="h-4 w-4 text-muted-foreground" />
+                    <div className={`absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-full border ${getTone(activity.type)}`}>
+                      <Icon className="h-4 w-4" />
                     </div>
 
                     <div className="flex items-start justify-between gap-4">
@@ -193,7 +239,7 @@ export default function ActivityPage() {
                           <code className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                             {activity.hash}
                           </code>
-                          <Badge variant="outline" className="gap-1 text-[10px] h-5 bg-success/10 text-success border-success/20">
+                          <Badge variant="outline" className={`gap-1 text-[10px] h-5 rounded-md ${getTone(activity.type)}`}>
                             <CheckCircle2 className="h-2.5 w-2.5" />
                             Verified
                           </Badge>
@@ -207,7 +253,7 @@ export default function ActivityPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
     </AppShell>
   )
 }

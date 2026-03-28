@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
-import { Lock, Unlock, Clock, MoreHorizontal, FileText, Plus } from "lucide-react"
+import { Lock, Unlock, Clock, MoreHorizontal, FileText, Plus, Shield, Files, Clock3 } from "lucide-react"
+import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { AppShell } from "@/components/app-shell"
 import { SearchFilter } from "@/components/search-filter"
@@ -193,10 +194,13 @@ export default function DocumentsPage() {
 
   const isEmpty = documents.length === 0
   const noResults = !isEmpty && filteredDocuments.length === 0
+  const totalDocuments = documents.length
+  const pendingDocuments = documents.filter((doc) => doc.status === "pending").length
+  const securedDocuments = documents.filter((doc) => doc.status === "locked" || doc.status === "unlocked").length
 
   return (
     <AppShell title="Documents">
-      <div className="space-y-6">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-semibold tracking-tight text-foreground">All Documents</h2>
@@ -204,10 +208,34 @@ export default function DocumentsPage() {
               View and manage all your secure documents
             </p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)} className="gap-2 w-full sm:w-auto">
+          <Button onClick={() => setIsModalOpen(true)} className="gap-2 w-full sm:w-auto bg-gradient-to-r from-sky-500 to-cyan-500 text-white hover:from-sky-400 hover:to-cyan-400 transition-all duration-150">
             <Plus className="h-4 w-4" />
             New Document
           </Button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-lg border border-border ring-1 ring-border bg-card p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Total Documents</p>
+              <Files className="h-4 w-4 text-sky-500" />
+            </div>
+            <p className="mt-3 text-2xl font-semibold text-foreground">{totalDocuments}</p>
+          </div>
+          <div className="rounded-lg border border-border ring-1 ring-border bg-card p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Pending Approvals</p>
+              <Clock3 className="h-4 w-4 text-amber-500" />
+            </div>
+            <p className="mt-3 text-2xl font-semibold text-foreground">{pendingDocuments}</p>
+          </div>
+          <div className="rounded-lg border border-border ring-1 ring-border bg-card p-5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Secured</p>
+              <Shield className="h-4 w-4 text-emerald-500" />
+            </div>
+            <p className="mt-3 text-2xl font-semibold text-foreground">{securedDocuments}</p>
+          </div>
         </div>
 
         {/* Search & Filter */}
@@ -222,17 +250,24 @@ export default function DocumentsPage() {
 
         {/* Empty State */}
         {isEmpty && (
-          <EmptyState
-            icon={FileText}
-            title="No documents yet"
-            description="Create your first secure document to get started with threshold-based access control."
-            action={
-              <Button onClick={() => setIsModalOpen(true)} className="gap-2">
+          <div className="rounded-xl border border-border ring-1 ring-border bg-card p-8">
+            <div className="mx-auto max-w-xl text-center space-y-4">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10">
+                <FileText className="h-7 w-7 text-sky-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-foreground">No secured documents yet</h3>
+              <p className="text-sm text-muted-foreground">
+                Start with a new document to unlock threshold-approved collaboration, immutable logs, and encrypted workflows.
+              </p>
+              <Button
+                onClick={() => setIsModalOpen(true)}
+                className="gap-2 bg-gradient-to-r from-sky-500 to-cyan-500 text-white hover:from-sky-400 hover:to-cyan-400 transition-all duration-150"
+              >
                 <Plus className="h-4 w-4" />
-                Create document
+                Create first secure document
               </Button>
-            }
-          />
+            </div>
+          </div>
         )}
 
         {/* No Results */}
@@ -351,7 +386,7 @@ export default function DocumentsPage() {
         {!isLoading && isRefreshing && (
           <p className="text-xs text-muted-foreground">Updating documents…</p>
         )}
-      </div>
+      </motion.div>
 
       {/* Create Document Modal */}
       <CreateDocumentModal

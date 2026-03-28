@@ -59,6 +59,7 @@ export function DocumentEditorPanel({
   const status = statusConfig[document.status]
   const StatusIcon = status.icon
   const isLocked = document.status !== "unlocked"
+  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0
 
   const handleSave = async () => {
     if (!onSave) return
@@ -178,6 +179,9 @@ export function DocumentEditorPanel({
               </Button>
             )}
             {!isLocked && (
+              <span className="text-[11px] text-muted-foreground">Ctrl+S to save</span>
+            )}
+            {!isLocked && (
               <Badge
                 variant="outline"
                 className={cn(
@@ -199,14 +203,14 @@ export function DocumentEditorPanel({
       </CardHeader>
       <CardContent className="flex-1 p-0 relative">
         {isLocked ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-muted/50 p-6">
-            <div className="text-center space-y-2">
-              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                <Lock className="h-6 w-6 text-muted-foreground" />
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/70 to-background/60 p-6">
+            <div className="text-center space-y-3">
+              <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center ring-1 ring-border">
+                <Lock className="h-8 w-8 text-muted-foreground animate-pulse" />
               </div>
-              <p className="text-sm font-medium text-foreground">Access Restricted</p>
-              <p className="text-xs text-muted-foreground max-w-[200px]">
-                This document requires threshold approval before it can be accessed.
+              <p className="text-base font-semibold text-foreground">Document Locked</p>
+              <p className="text-xs text-muted-foreground max-w-[240px]">
+                This content is encrypted and can only be opened after threshold approval is completed.
               </p>
             </div>
           </div>
@@ -218,6 +222,7 @@ export function DocumentEditorPanel({
           placeholder="Start typing..."
           className={cn(
             "min-h-[400px] h-full resize-none rounded-none border-0 focus-visible:ring-0 p-4",
+            !isLocked && "bg-[linear-gradient(to_bottom,rgba(250,250,250,0.65),rgba(255,255,255,0.2))]",
             isLocked && "opacity-30 cursor-not-allowed"
           )}
         />
@@ -228,6 +233,8 @@ export function DocumentEditorPanel({
           <span>Encrypted document</span>
           <span className="text-border">|</span>
           <span>Threshold secured</span>
+          <span className="text-border">|</span>
+          <span>{wordCount} words</span>
           {!isLocked && (
             <>
               <span className="text-border">|</span>
