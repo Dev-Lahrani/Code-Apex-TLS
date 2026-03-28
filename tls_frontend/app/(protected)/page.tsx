@@ -84,7 +84,7 @@ export default function DashboardPage() {
                 const logsResponse = await getLogs(doc.id, user.id)
                 const logs = logsResponse.data.logs
                 const requestLogs = logs.filter(
-                  (entry) => entry.action.toLowerCase().includes("requested access") && !!entry.details
+                  (entry) => entry.action.toLowerCase().includes("requested access")
                 )
                 const latestRequestLog = requestLogs
                   .slice()
@@ -99,34 +99,41 @@ export default function DashboardPage() {
                     userDirectory[requesterId]?.name || "Unknown user"
                 }
 
-                const ownRequest = requestLogs.find((entry) => entry.user_id === user.id)
-                const activeRequestId = ownRequest?.details ?? requestLogs[0]?.details
+                const ownRequest = requestLogs
+                  .filter((entry) => entry.user_id === user.id)
+                  .sort(
+                    (a, b) =>
+                      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                  )[0]
+                const activeRequestId = ownRequest?.details ?? latestRequestLog?.details
 
-                if (!activeRequestId) return base
+                if (!requestLogs.length) return base
 
-                const relatedLogs = logs.filter((entry) => entry.details === activeRequestId)
+                const approvalLogs = logs.filter((entry) =>
+                  entry.action.toLowerCase().includes("approved request")
+                )
+                const relatedApprovalLogs = activeRequestId
+                  ? approvalLogs.filter((entry) => entry.details === activeRequestId)
+                  : approvalLogs
                 const approvedUsers = new Set(
-                  relatedLogs
-                    .filter((entry) => entry.action.toLowerCase().includes("approved") && !!entry.user_id)
+                  relatedApprovalLogs
+                    .filter((entry) => !!entry.user_id)
                     .map((entry) => entry.user_id as string)
                 )
                 const approvalsCount = approvedUsers.size
                 const thresholdMet =
-                  relatedLogs.some((entry) => {
+                  logs.some((entry) => {
                     const action = entry.action.toLowerCase()
-                    return action.includes("threshold met") || action.includes("access granted")
+                    const matchesAction = action.includes("threshold met") || action.includes("access granted")
+                    if (!matchesAction) return false
+                    return activeRequestId ? entry.details === activeRequestId : true
                   }) || approvalsCount >= base.requiredApprovals
 
                 return mapApiDocument(doc, userDirectory, {
                   currentApprovals: thresholdMet
                     ? base.requiredApprovals
                     : Math.min(approvalsCount, base.requiredApprovals),
-                  status:
-                    ownRequest && thresholdMet
-                      ? "unlocked"
-                      : ownRequest || requestLogs.length > 0
-                        ? "pending"
-                        : "locked",
+                  status: thresholdMet ? "unlocked" : "pending",
                   requestId: activeRequestId,
                 })
               } catch {
