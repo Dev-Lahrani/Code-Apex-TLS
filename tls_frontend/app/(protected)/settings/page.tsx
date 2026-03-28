@@ -3,7 +3,6 @@
 import { useState } from "react"
 import {
   Shield,
-  Check,
   User,
   TriangleAlert,
   Clipboard,
@@ -28,7 +27,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "@/hooks/use-toast"
 
@@ -38,6 +36,7 @@ export default function SettingsPage() {
   const [name, setName] = useState(user?.name || "")
   const [email, setEmail] = useState(user?.email || "")
   const [isSaving, setIsSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "U"
 
   const handleSave = async () => {
@@ -45,6 +44,7 @@ export default function SettingsPage() {
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 500))
     setIsSaving(false)
+    setIsEditing(false)
     toast({
       title: "Settings saved",
       description: "Your profile has been updated successfully.",
@@ -121,6 +121,7 @@ export default function SettingsPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Enter your name"
+                  disabled={!isEditing}
                 />
               </div>
               <div className="space-y-2">
@@ -131,12 +132,32 @@ export default function SettingsPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
+                  disabled={!isEditing}
                 />
               </div>
             </div>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save changes"}
-            </Button>
+            {!isEditing ? (
+              <Button variant="outline" onClick={() => setIsEditing(true)}>
+                Edit changes
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Save changes"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setName(user?.name || "")
+                    setEmail(user?.email || "")
+                    setIsEditing(false)
+                  }}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -231,22 +252,6 @@ export default function SettingsPage() {
               <p className="text-sm font-medium flex items-center gap-2"><Unlock className="h-4 w-4 text-indigo-600" /> 4. Secure Access</p>
               <p className="mt-1 text-sm text-muted-foreground">The requester receives time-limited decrypted access. Every action is logged with a SHA-256 hash.</p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="ring-1 ring-border">
-          <CardHeader>
-            <CardTitle className="text-lg">About</CardTitle>
-            <CardDescription>Product and build information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <p><span className="text-muted-foreground">Product:</span> <span className="font-medium">CodeApex TLS</span></p>
-              <p><span className="text-muted-foreground">Version:</span> <span className="font-medium">1.0.0-hackathon</span></p>
-              <p className="sm:col-span-2"><span className="text-muted-foreground">Built with:</span> <span className="font-medium">Next.js 14, FastAPI, PostgreSQL, IPFS, pycryptodomex</span></p>
-              <p className="sm:col-span-2"><span className="text-muted-foreground">Purpose:</span> <span className="font-medium">Document management system built for secure threshold-controlled collaboration</span></p>
-            </div>
-            <Badge variant="outline" className="rounded-md">Built for hackathon</Badge>
           </CardContent>
         </Card>
 
