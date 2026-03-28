@@ -223,6 +223,7 @@ export function DocumentEditorPanel({
           className={cn(
             "min-h-[400px] h-full resize-none rounded-none border-0 focus-visible:ring-0 p-4",
             !isLocked && "bg-[linear-gradient(to_bottom,rgba(250,250,250,0.65),rgba(255,255,255,0.2))]",
+            !isLocked && "dark:bg-[linear-gradient(to_bottom,rgba(15,23,42,0.92),rgba(15,23,42,0.72))] dark:text-slate-100 dark:placeholder:text-slate-400",
             isLocked && "opacity-30 cursor-not-allowed"
           )}
         />
