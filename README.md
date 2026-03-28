@@ -10,6 +10,7 @@ This project was built to demonstrate real security primitives in a practical pr
 - Real cryptography, not mock security.
 - Threshold approvals enforced before decryption.
 - Immutable-style activity trail with SHA-256 hashing.
+- AI-assisted anomaly detection on document edits.
 - Optional blockchain anchoring for audit events.
 - End-to-end full stack product: FastAPI + PostgreSQL + Next.js.
 
@@ -23,6 +24,7 @@ This project was built to demonstrate real security primitives in a practical pr
 - Multi-party approvals with automatic threshold evaluation.
 - Controlled unlock and edit flow for approved requesters.
 - Activity timeline and audit log visibility.
+- Hybrid anomaly detection (TinyLlama JSON classifier + secure rule-based fallback).
 
 ## Security model
 1. Document content is encrypted with AES-256-GCM.
@@ -31,6 +33,21 @@ This project was built to demonstrate real security primitives in a practical pr
 4. Other participants approve the request.
 5. Once threshold is met, key shares are reconstructed and decryption is allowed.
 6. Critical actions are logged with SHA-256 hashes (and optionally anchored on-chain).
+
+## Anomaly detection
+CodeApex TLS includes anomaly scoring for document edits via `app/services/anomaly_service.py`.
+
+How it works:
+- Sends content to a local TinyLlama model through Ollama (`/api/generate`).
+- Enforces JSON output format: `{"risk_score": <0-1>, "label": "safe|suspicious"}`.
+- If model output is malformed, attempts JSON extraction from raw response.
+- If parsing still fails, falls back to deterministic pattern checks on original content (SQL injection, shell abuse, command execution patterns, etc.).
+- This avoids false positives from prose-only LLM responses.
+
+Runtime behavior:
+- Returns `risk_score` clamped to `[0.0, 1.0]`.
+- Uses label values: `safe` or `suspicious`.
+- Gracefully degrades to safe defaults if the model endpoint is unavailable.
 
 ## Tech stack
 - Backend: FastAPI, SQLAlchemy (async), PostgreSQL, Alembic
@@ -110,6 +127,10 @@ Optional:
 - `REDIS_ENABLED`
 - `REDIS_URL`
 - `ACCESS_REQUEST_TTL_SECONDS` (default: 3600)
+
+Optional local AI runtime:
+- Ollama running at `http://localhost:11434`
+- TinyLlama model available in Ollama (`tinyllama`)
 
 Optional blockchain anchoring:
 - `BLOCKCHAIN_ENABLED`
