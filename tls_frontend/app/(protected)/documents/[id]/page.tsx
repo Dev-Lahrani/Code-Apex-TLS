@@ -35,7 +35,7 @@ interface PageProps {
 
 export default function DocumentViewPage({ params }: PageProps) {
 const { id } = use(params)
-const { user } = useAuth()
+const { user, isLoading: isAuthLoading } = useAuth()
 
 const REQUEST_STORAGE_KEY = "secure_docs-active-requests"
 const ACCESS_REQUEST_TTL_MS =
@@ -48,6 +48,7 @@ const [document, setDocument] = useState<Document | null>(null)
   const [content, setContent] = useState("")
   const [isDirty, setIsDirty] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const hasLoadedOnceRef = useRef(false)
   const isDirtyRef = useRef(false)
   const [isRequesting, setIsRequesting] = useState(false)
   const [isApproving, setIsApproving] = useState<string | null>(null)
@@ -124,13 +125,17 @@ const [document, setDocument] = useState<Document | null>(null)
   }, [activeRequest, currentUserId, id])
 
   useEffect(() => {
-    if (!currentUserId) return
+    if (isAuthLoading) return
+    if (!currentUserId) {
+      setIsLoading(false)
+      return
+    }
     let cancelled = false
     let interval: ReturnType<typeof setInterval> | undefined
 
     const load = async (isPoll = false) => {
       try {
-        if (!isPoll) {
+        if (!isPoll && !hasLoadedOnceRef.current) {
           setIsLoading(true)
         } else {
           setIsSyncing(true)
@@ -345,6 +350,7 @@ const [document, setDocument] = useState<Document | null>(null)
         }
       } finally {
         if (!cancelled) {
+          hasLoadedOnceRef.current = true
           setIsLoading(false)
           setIsSyncing(false)
         }
@@ -358,7 +364,7 @@ const [document, setDocument] = useState<Document | null>(null)
       cancelled = true
       if (interval) clearInterval(interval)
     }
-  }, [activeRequest, currentUserId, id, participantLookup])
+  }, [activeRequest, currentUserId, id, isAuthLoading, participantLookup])
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -516,7 +522,7 @@ const [document, setDocument] = useState<Document | null>(null)
     }
   }, [activeRequest, document?.status, handleSave])
 
-  if (isLoading) {
+  if (isAuthLoading || (isLoading && !document && !missing)) {
     return (
       <AppShell title="Document">
         <div className="flex items-center gap-2 text-muted-foreground">
