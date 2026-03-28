@@ -1,63 +1,132 @@
-# SECURE_Docs
+# CodeApex TLS
 
-Zero-trust document collaboration stack with a FastAPI backend and a Next.js frontend. Documents are encrypted with AES-256, split into key shares via Shamir Secret Sharing, and unlocked only after threshold approvals. Optional blockchain logging can emit activity proofs on-chain.
+Threshold-locked. Cryptographically secured.
 
-## Repository layout
-- `app/` FastAPI application (models, services, API routes)
-- `tls_frontend/` Next.js 16 UI (App Router, pnpm)
-- `contracts/` Solidity ActionLogger for on-chain audit events
-- `alembic/` Database migrations scaffold
+CodeApex TLS is a zero-trust document collaboration platform where no single user can unilaterally unlock sensitive content. Documents are encrypted with AES-256-GCM, encryption keys are split with Shamir's Secret Sharing, and access is granted only when the required participant approval threshold is met.
 
-## Prerequisites
-- Python 3.12+
-- PostgreSQL (for `asyncpg` DSN)
-- pnpm 10.x (frontend)
-- Redis and an EVM RPC endpoint are optional
+This project was built to demonstrate real security primitives in a practical product workflow: create, request, approve, decrypt, edit, and audit.
 
-## Backend setup
-1) Copy environment template: `cp .env.example .env` and fill values (notably `DATABASE_URL`).
-2) Create a virtual env and install deps:
+## Why this project stands out
+- Real cryptography, not mock security.
+- Threshold approvals enforced before decryption.
+- Immutable-style activity trail with SHA-256 hashing.
+- Optional blockchain anchoring for audit events.
+- End-to-end full stack product: FastAPI + PostgreSQL + Next.js.
+
+## Core capabilities
+- Secure document creation with encrypted storage.
+- Per-document threshold models:
+  - `fixed`
+  - `percentage`
+  - `smart`
+- Participant-based access request workflow.
+- Multi-party approvals with automatic threshold evaluation.
+- Controlled unlock and edit flow for approved requesters.
+- Activity timeline and audit log visibility.
+
+## Security model
+1. Document content is encrypted with AES-256-GCM.
+2. Encryption key is split into participant shares using Shamir's Secret Sharing.
+3. A participant requests access.
+4. Other participants approve the request.
+5. Once threshold is met, key shares are reconstructed and decryption is allowed.
+6. Critical actions are logged with SHA-256 hashes (and optionally anchored on-chain).
+
+## Tech stack
+- Backend: FastAPI, SQLAlchemy (async), PostgreSQL, Alembic
+- Frontend: Next.js (App Router), TypeScript, Tailwind, shadcn/ui
+- Crypto: pycryptodomex
+- Optional infra: Redis, Ethereum-compatible RPC
+
+## Repository structure
+- `app/` FastAPI backend (API, services, models, crypto utilities)
+- `tls_frontend/` Next.js frontend
+- `contracts/` Solidity contract for action logging
+- `alembic/` Migration scaffold
+
+## Quick start
+
+### 1) Clone and configure
+```bash
+git clone https://github.com/Dev-Lahrani/Code-Apex-TLS.git
+cd Code-Apex-TLS
+cp .env.example .env
 ```
+
+Set required values in `.env` (especially `DATABASE_URL`).
+
+### 2) Backend setup
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
-If you hit the `externally-managed-environment` error, do not use system pip; either activate the venv as above or run commands explicitly via `.venv/bin/pip`, `.venv/bin/alembic`, and `.venv/bin/uvicorn`.
-3) Initialize the database (versions folder is empty by default):
-```
+
+Run migrations:
+```bash
 alembic revision --autogenerate -m "init"
 alembic upgrade head
 ```
-4) Run the API:
-```
+
+Start API:
+```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
-Docs are served at `/docs` and `/redoc`.
 
-## Frontend setup
-1) `cd tls_frontend`
-2) `pnpm install`
-3) `pnpm dev` (default API base: `http://localhost:8000/api`; override with `NEXT_PUBLIC_API_BASE_URL`)
+Backend docs:
+- `http://localhost:8000/docs`
+- `http://localhost:8000/redoc`
 
-## Core concepts
-- Users own documents and can be participants.
-- Documents store encrypted content plus a threshold rule (`fixed`, `percentage`, or `smart` weighting owners).
-- Participants hold Shamir key shares; approvals reconstruct the encryption key.
-- Access requests move from `pending` to `approved` once the threshold is met.
-- Activity logs capture key actions; optional blockchain logging can mirror events on-chain.
+### 3) Frontend setup
+```bash
+cd tls_frontend
+pnpm install
+pnpm dev
+```
 
-## API surface (prefix `/api`)
-- `GET /health` health check
-- Auth: `POST /auth/register`, `POST /auth/login`
-- Users: `POST /users`, `GET /users`, `GET /users/{user_id}`
-- Documents: `POST /documents`, `GET /documents?user_id=...`, `GET /documents/{id}` (requires approved request), `POST /documents/{id}/edit`, `GET /documents/{id}/logs`
-- Access flow: `POST /documents/{id}/request-access`, `POST /requests/{request_id}/approve`
+Default API base is `http://localhost:8000/api` unless overridden by `NEXT_PUBLIC_API_BASE_URL`.
 
-## Environment reference
-- Required: `DATABASE_URL` (e.g., `postgresql+asyncpg://user:pass@localhost:5432/codeapex`)
-- Optional: `REDIS_ENABLED`, `REDIS_URL`
-- Optional blockchain: `BLOCKCHAIN_ENABLED`, `BLOCKCHAIN_RPC_URL`, `BLOCKCHAIN_PRIVATE_KEY`, `BLOCKCHAIN_CONTRACT_ADDRESS`, `BLOCKCHAIN_CHAIN_ID`, `BLOCKCHAIN_SENDER_ADDRESS`
-- Access TTL (default 1h): `ACCESS_REQUEST_TTL_SECONDS`
+## API highlights (prefix: `/api`)
+- `GET /health`
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /users`
+- `GET /users`
+- `GET /users/{user_id}`
+- `POST /documents`
+- `GET /documents?user_id=...`
+- `GET /documents/{id}` (requires approved request)
+- `POST /documents/{id}/edit`
+- `GET /documents/{id}/logs`
+- `POST /documents/{id}/request-access`
+- `POST /requests/{request_id}/approve`
+
+## Environment variables
+
+Required:
+- `DATABASE_URL` (example: `postgresql+asyncpg://user:pass@localhost:5432/codeapex`)
+
+Optional:
+- `REDIS_ENABLED`
+- `REDIS_URL`
+- `ACCESS_REQUEST_TTL_SECONDS` (default: 3600)
+
+Optional blockchain anchoring:
+- `BLOCKCHAIN_ENABLED`
+- `BLOCKCHAIN_RPC_URL`
+- `BLOCKCHAIN_PRIVATE_KEY`
+- `BLOCKCHAIN_CONTRACT_ADDRESS`
+- `BLOCKCHAIN_CHAIN_ID`
+- `BLOCKCHAIN_SENDER_ADDRESS`
 
 ## Smart contract
-`contracts/ActionLogger.sol` exposes `logAction` and an `ActionLogged` event for on-chain auditability when blockchain logging is enabled.
+`contracts/ActionLogger.sol` exposes `logAction` and emits `ActionLogged`, enabling verifiable audit anchoring when blockchain mode is enabled.
+
+## Demo-ready narrative (for judges)
+- "No single insider can unlock sensitive documents."
+- "Access is mathematically threshold-gated."
+- "Every critical action is traceable and tamper-evident."
+- "The system balances usability and strong cryptographic guarantees."
+
+## Team note
+CodeApex TLS is designed as a hackathon-ready prototype with production-minded security architecture and clear extension points for enterprise-grade hardening.
