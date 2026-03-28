@@ -46,6 +46,8 @@ const ACCESS_REQUEST_TTL_MS =
 const [directory, setDirectory] = useState<UserDirectory>({})
 const [document, setDocument] = useState<Document | null>(null)
   const [content, setContent] = useState("")
+  const [isDirty, setIsDirty] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const isDirtyRef = useRef(false)
   const [isRequesting, setIsRequesting] = useState(false)
   const [isApproving, setIsApproving] = useState<string | null>(null)
@@ -229,6 +231,7 @@ const [document, setDocument] = useState<Document | null>(null)
           setDocument(mapped)
           if (!isApprovedForCurrentUser) {
             setContent("")
+            setIsDirty(false)
             isDirtyRef.current = false
           }
         }
@@ -254,6 +257,7 @@ const [document, setDocument] = useState<Document | null>(null)
             )
             if (!isDirtyRef.current) {
               setContent(latestContent)
+              setIsDirty(false)
             }
           }
         }
@@ -356,6 +360,18 @@ const [document, setDocument] = useState<Document | null>(null)
     }
   }, [activeRequest, currentUserId, id, participantLookup])
 
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirtyRef.current) return
+      event.preventDefault()
+      event.returnValue = ""
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+    }
+  }, [])
+
   const handleRequestAccess = async () => {
     if (!document || !currentUserId) return
     setIsRequesting(true)
@@ -440,6 +456,7 @@ const [document, setDocument] = useState<Document | null>(null)
 
   const handleContentChange = (newContent: string) => {
     setContent(newContent)
+    setIsDirty(true)
     isDirtyRef.current = true
     if (document) {
       setDocument({
@@ -469,6 +486,9 @@ const [document, setDocument] = useState<Document | null>(null)
             }
           : prev
       )
+      const savedAt = new Date()
+      setLastSavedAt(savedAt)
+      setIsDirty(false)
       isDirtyRef.current = false
       toast({
         title: "Edit saved",
@@ -482,6 +502,19 @@ const [document, setDocument] = useState<Document | null>(null)
       })
     }
   }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "s") return
+      if (document?.status !== "unlocked" || !activeRequest) return
+      event.preventDefault()
+      void handleSave()
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [activeRequest, document?.status, handleSave])
 
   if (isLoading) {
     return (
@@ -526,6 +559,8 @@ const [document, setDocument] = useState<Document | null>(null)
             <DocumentEditorPanel
               document={document}
               content={content}
+              isDirty={isDirty}
+              lastSavedAt={lastSavedAt}
               onContentChange={handleContentChange}
               onSave={document.status === "unlocked" ? handleSave : undefined}
             />

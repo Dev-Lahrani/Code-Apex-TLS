@@ -134,6 +134,13 @@ export function TopNavbar({ title }: TopNavbarProps) {
     setLastSeenAt(seenAt)
   }
 
+  const handleMarkAllAsRead = () => {
+    if (!storageKey || typeof window === "undefined") return
+    const newestTs = notifications[0]?.timestamp.getTime() ?? Date.now()
+    window.localStorage.setItem(storageKey, String(newestTs))
+    setLastSeenAt(newestTs)
+  }
+
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <h1 className="text-lg font-semibold text-foreground">{title}</h1>
@@ -156,7 +163,17 @@ export function TopNavbar({ title }: TopNavbarProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-96 max-h-[420px] overflow-auto">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuLabel className="flex items-center justify-between gap-2">
+              <span>Notifications</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={handleMarkAllAsRead}
+              >
+                Mark all as read
+              </Button>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {isLoading ? (
               <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">

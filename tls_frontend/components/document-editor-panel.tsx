@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, type ChangeEvent } from "react"
+import { formatDistanceToNow } from "date-fns"
 import { Lock, Unlock, Shield, Save, Paperclip } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +33,8 @@ const statusConfig: Record<DocumentStatus, { label: string; icon: typeof Lock; c
 interface DocumentEditorPanelProps {
   document: Document
   content: string
+  isDirty?: boolean
+  lastSavedAt?: Date | null
   onContentChange: (content: string) => void
   onSave?: () => Promise<void>
 }
@@ -46,6 +49,8 @@ const BINARY_FILE_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx"])
 export function DocumentEditorPanel({
   document,
   content,
+  isDirty = false,
+  lastSavedAt = null,
   onContentChange,
   onSave,
 }: DocumentEditorPanelProps) {
@@ -172,6 +177,19 @@ export function DocumentEditorPanel({
                 {isSaving ? "Saving..." : "Save"}
               </Button>
             )}
+            {!isLocked && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "gap-1",
+                  isDirty
+                    ? "bg-warning/10 text-warning-foreground border-warning/20"
+                    : "bg-success/10 text-success border-success/20"
+                )}
+              >
+                {isDirty ? "Unsaved changes" : "Saved"}
+              </Badge>
+            )}
             <Badge variant="outline" className={cn("gap-1", status.className)}>
               <StatusIcon className="h-3 w-3" />
               {status.label}
@@ -210,6 +228,16 @@ export function DocumentEditorPanel({
           <span>Encrypted document</span>
           <span className="text-border">|</span>
           <span>Threshold secured</span>
+          {!isLocked && (
+            <>
+              <span className="text-border">|</span>
+              <span>
+                {lastSavedAt
+                  ? `Last saved ${formatDistanceToNow(lastSavedAt, { addSuffix: true })}`
+                  : "Not saved yet"}
+              </span>
+            </>
+          )}
         </div>
       </CardFooter>
     </Card>
