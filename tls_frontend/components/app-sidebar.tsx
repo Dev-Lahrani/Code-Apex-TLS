@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { LayoutDashboard, FileText, Activity, Shield, Settings, Plus } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { LayoutDashboard, FileText, Activity, Shield, Settings, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -22,7 +22,8 @@ interface AppSidebarProps {
 
 export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const pathname = usePathname()
-  const { user } = useAuth()
+  const router = useRouter()
+  const { user, logout } = useAuth()
 
   const initials = user?.name
     ?.split(" ")
@@ -30,6 +31,12 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
     .join("")
     .toUpperCase()
     .slice(0, 2) || "U"
+
+  const handleSignOut = () => {
+    logout()
+    onNavigate?.()
+    router.push("/login")
+  }
 
   return (
     <div className="flex h-full w-full flex-col bg-sidebar">
@@ -80,13 +87,12 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
 
       <div className="px-3 pb-3">
         <Button
-          asChild
-          className="w-full justify-start gap-2 bg-gradient-to-r from-sky-500 to-cyan-500 text-white hover:from-sky-400 hover:to-cyan-400 transition-all duration-150"
+          variant="outline"
+          className="w-full justify-start gap-2 transition-all duration-150"
+          onClick={handleSignOut}
         >
-          <Link href="/" onClick={onNavigate}>
-            <Plus className="h-4 w-4" />
-            New Document
-          </Link>
+          <LogOut className="h-4 w-4" />
+          Sign out
         </Button>
       </div>
 
