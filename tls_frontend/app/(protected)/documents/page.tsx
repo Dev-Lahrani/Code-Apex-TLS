@@ -61,6 +61,7 @@ export default function DocumentsPage() {
   const router = useRouter()
   const { user } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
+  const [requesterByDocId, setRequesterByDocId] = useState<Record<string, string>>({})
   const [userDirectory, setUserDirectory] = useState<UserDirectory>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -111,6 +112,7 @@ export default function DocumentsPage() {
         }
         const response = await getDocuments(user.id)
         if (!cancelled) {
+          const nextRequesterByDocId: Record<string, string> = {}
           const mappedDocuments = await Promise.all(
             response.data.documents.map(async (doc) => {
               const base = mapApiDocument(doc, userDirectory)
@@ -121,6 +123,18 @@ export default function DocumentsPage() {
                 const requestLogs = logs.filter(
                   (entry) => entry.action.toLowerCase().includes("requested access") && !!entry.details
                 )
+                const latestRequestLog = requestLogs
+                  .slice()
+                  .sort(
+                    (a, b) =>
+                      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                  )[0]
+
+                const requesterId = latestRequestLog?.user_id ?? undefined
+                if (requesterId) {
+                  nextRequesterByDocId[doc.id] =
+                    userDirectory[requesterId]?.name || "Unknown user"
+                }
 
                 const ownRequest = requestLogs.find((entry) => entry.user_id === user.id)
                 const activeRequestId = ownRequest?.details ?? requestLogs[0]?.details
@@ -159,6 +173,7 @@ export default function DocumentsPage() {
           )
 
           setDocuments(mappedDocuments)
+          setRequesterByDocId(nextRequesterByDocId)
         }
       } catch (error) {
         if (!cancelled) {
@@ -346,6 +361,7 @@ export default function DocumentsPage() {
                   <TableHead className="w-[300px]">Document</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Threshold</TableHead>
+                  <TableHead>Requester</TableHead>
                   <TableHead>Participants</TableHead>
                   <TableHead>Last Updated</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -373,6 +389,9 @@ export default function DocumentsPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {doc.currentApprovals}/{doc.requiredApprovals}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {requesterByDocId[doc.id] || "—"}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center">

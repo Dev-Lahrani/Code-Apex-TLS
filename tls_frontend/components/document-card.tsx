@@ -38,9 +38,10 @@ const statusSurface: Record<DocumentStatus, string> = {
 interface DocumentCardProps {
   document: Document
   index?: number
+  requesterName?: string
 }
 
-export function DocumentCard({ document, index = 0 }: DocumentCardProps) {
+export function DocumentCard({ document, index = 0, requesterName }: DocumentCardProps) {
   const status = statusConfig[document.status]
   const StatusIcon = status.icon
   const preview = document.content?.trim()
@@ -72,6 +73,9 @@ export function DocumentCard({ document, index = 0 }: DocumentCardProps) {
         <CardContent className="flex-1 pb-3">
           <p className="text-sm text-muted-foreground">
             {document.currentApprovals} of {document.requiredApprovals} approvals required
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Requester: <span className="font-medium text-foreground">{requesterName || "—"}</span>
           </p>
           <div className="mt-3 flex items-center gap-1">
             {document.participants.slice(0, 4).map((participant, idx) => (

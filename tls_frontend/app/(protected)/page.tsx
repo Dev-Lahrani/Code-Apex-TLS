@@ -11,7 +11,7 @@ import { SearchFilter } from "@/components/search-filter"
 import { EmptyState } from "@/components/empty-state"
 import { Spinner } from "@/components/ui/spinner"
 import { useAuth } from "@/lib/auth-context"
-import { getDocuments, getUsers } from "@/lib/api"
+import { getDocuments, getLogs, getUsers } from "@/lib/api"
 import {
   mapApiDocument,
   type Document,
@@ -23,6 +23,7 @@ import { toast } from "@/hooks/use-toast"
 export default function DashboardPage() {
   const { user } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
+  const [requesterByDocId, setRequesterByDocId] = useState<Record<string, string>>({})
   const [userDirectory, setUserDirectory] = useState<UserDirectory>({})
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -74,8 +75,67 @@ export default function DashboardPage() {
         }
         const response = await getDocuments(user.id)
         if (!cancelled) {
-          const mapped = response.data.documents.map((doc) => mapApiDocument(doc, userDirectory))
+          const nextRequesterByDocId: Record<string, string> = {}
+          const mapped = await Promise.all(
+            response.data.documents.map(async (doc) => {
+              const base = mapApiDocument(doc, userDirectory)
+
+              try {
+                const logsResponse = await getLogs(doc.id, user.id)
+                const logs = logsResponse.data.logs
+                const requestLogs = logs.filter(
+                  (entry) => entry.action.toLowerCase().includes("requested access") && !!entry.details
+                )
+                const latestRequestLog = requestLogs
+                  .slice()
+                  .sort(
+                    (a, b) =>
+                      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                  )[0]
+
+                const requesterId = latestRequestLog?.user_id ?? undefined
+                if (requesterId) {
+                  nextRequesterByDocId[doc.id] =
+                    userDirectory[requesterId]?.name || "Unknown user"
+                }
+
+                const ownRequest = requestLogs.find((entry) => entry.user_id === user.id)
+                const activeRequestId = ownRequest?.details ?? requestLogs[0]?.details
+
+                if (!activeRequestId) return base
+
+                const relatedLogs = logs.filter((entry) => entry.details === activeRequestId)
+                const approvedUsers = new Set(
+                  relatedLogs
+                    .filter((entry) => entry.action.toLowerCase().includes("approved") && !!entry.user_id)
+                    .map((entry) => entry.user_id as string)
+                )
+                const approvalsCount = approvedUsers.size
+                const thresholdMet =
+                  relatedLogs.some((entry) => {
+                    const action = entry.action.toLowerCase()
+                    return action.includes("threshold met") || action.includes("access granted")
+                  }) || approvalsCount >= base.requiredApprovals
+
+                return mapApiDocument(doc, userDirectory, {
+                  currentApprovals: thresholdMet
+                    ? base.requiredApprovals
+                    : Math.min(approvalsCount, base.requiredApprovals),
+                  status:
+                    ownRequest && thresholdMet
+                      ? "unlocked"
+                      : ownRequest || requestLogs.length > 0
+                        ? "pending"
+                        : "locked",
+                  requestId: activeRequestId,
+                })
+              } catch {
+                return base
+              }
+            })
+          )
           setDocuments(mapped)
+          setRequesterByDocId(nextRequesterByDocId)
         }
       } catch (error) {
         if (!cancelled) {
@@ -234,7 +294,12 @@ export default function DashboardPage() {
         {!isEmpty && !noResults && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredDocuments.map((doc, index) => (
-              <DocumentCard key={doc.id} document={doc} index={index} />
+              <DocumentCard
+                key={doc.id}
+                document={doc}
+                index={index}
+                requesterName={requesterByDocId[doc.id]}
+              />
             ))}
           </div>
         )}
