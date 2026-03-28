@@ -30,7 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getDocuments, getUsers } from "@/lib/api"
+import { getDocuments, getLogs, getUsers } from "@/lib/api"
 import {
   mapApiDocument,
   type Document,
@@ -111,7 +111,54 @@ export default function DocumentsPage() {
         }
         const response = await getDocuments(user.id)
         if (!cancelled) {
-          setDocuments(response.data.documents.map((doc) => mapApiDocument(doc, userDirectory)))
+          const mappedDocuments = await Promise.all(
+            response.data.documents.map(async (doc) => {
+              const base = mapApiDocument(doc, userDirectory)
+
+              try {
+                const logsResponse = await getLogs(doc.id, user.id)
+                const logs = logsResponse.data.logs
+                const requestLogs = logs.filter(
+                  (entry) => entry.action.toLowerCase().includes("requested access") && !!entry.details
+                )
+
+                const ownRequest = requestLogs.find((entry) => entry.user_id === user.id)
+                const activeRequestId = ownRequest?.details ?? requestLogs[0]?.details
+
+                if (!activeRequestId) return base
+
+                const relatedLogs = logs.filter((entry) => entry.details === activeRequestId)
+                const approvedUsers = new Set(
+                  relatedLogs
+                    .filter((entry) => entry.action.toLowerCase().includes("approved") && !!entry.user_id)
+                    .map((entry) => entry.user_id as string)
+                )
+                const approvalsCount = approvedUsers.size
+                const thresholdMet =
+                  relatedLogs.some((entry) => {
+                    const action = entry.action.toLowerCase()
+                    return action.includes("threshold met") || action.includes("access granted")
+                  }) || approvalsCount >= base.requiredApprovals
+
+                return mapApiDocument(doc, userDirectory, {
+                  currentApprovals: thresholdMet
+                    ? base.requiredApprovals
+                    : Math.min(approvalsCount, base.requiredApprovals),
+                  status:
+                    ownRequest && thresholdMet
+                      ? "unlocked"
+                      : ownRequest || requestLogs.length > 0
+                        ? "pending"
+                        : "locked",
+                  requestId: activeRequestId,
+                })
+              } catch {
+                return base
+              }
+            })
+          )
+
+          setDocuments(mappedDocuments)
         }
       } catch (error) {
         if (!cancelled) {
