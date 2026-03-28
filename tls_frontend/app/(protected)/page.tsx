@@ -142,7 +142,7 @@ export default function DashboardPage() {
               {greeting}, {user?.name?.split(" ")[0] || "there"}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Here&apos;s an overview of your secure documents
+              Manage your threshold-controlled secure documents
             </p>
           </div>
           <Button
@@ -164,14 +164,14 @@ export default function DashboardPage() {
           </div>
           <div className="rounded-lg border border-border ring-1 ring-border bg-card p-5">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Pending Approvals</p>
+              <p className="text-sm text-muted-foreground">Awaiting Approval</p>
               <Clock3 className="h-4 w-4 text-amber-500" />
             </div>
             <p className="mt-3 text-2xl font-semibold text-foreground">{pendingDocuments}</p>
           </div>
           <div className="rounded-lg border border-border ring-1 ring-border bg-card p-5">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Secured</p>
+              <p className="text-sm text-muted-foreground">Access Granted</p>
               <Shield className="h-4 w-4 text-emerald-500" />
             </div>
             <p className="mt-3 text-2xl font-semibold text-foreground">{securedDocuments}</p>

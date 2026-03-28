@@ -10,7 +10,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'SECURE_Docs',
+  title: 'CodeApex TLS',
   description: 'Secure, threshold-controlled document collaboration with TLS frontend',
   generator: 'v0.app',
   icons: {

@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Documents", href: "/documents", icon: FileText },
-  { name: "Activity", href: "/activity", icon: Activity },
+  { name: "Audit Feed", href: "/activity", icon: Activity },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
 
@@ -38,8 +38,10 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary ring-1 ring-primary/20">
           <Shield className="h-4 w-4 text-primary-foreground" />
         </div>
-        <span className="text-sm font-semibold text-sidebar-foreground">ZeroTrust Docs</span>
-        <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">v1.0</span>
+        <div className="min-w-0">
+          <span className="block text-sm font-semibold text-sidebar-foreground leading-tight">CodeApex TLS</span>
+          <span className="text-[10px] text-muted-foreground">v1.0 · TLS</span>
+        </div>
       </div>
 
       {/* Navigation */}

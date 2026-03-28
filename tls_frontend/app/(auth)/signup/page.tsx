@@ -1,6 +1,6 @@
 "use client"
 
-import { Lock, Shield, ShieldCheck } from "lucide-react"
+import { Lock, Shield, ShieldCheck, Database } from "lucide-react"
 import { AuthForm } from "@/components/auth/auth-form"
 
 export default function SignupPage() {
@@ -16,27 +16,31 @@ export default function SignupPage() {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Security Workspace</p>
-                <p className="text-lg font-semibold text-white">ZeroTrust Docs</p>
+                <p className="text-lg font-semibold text-white">CodeApex TLS</p>
               </div>
             </div>
             <div className="max-w-md space-y-3">
               <h1 className="text-3xl font-semibold leading-tight text-white">Build secure collaboration with confidence.</h1>
               <p className="text-sm text-slate-300">
-                Zero-trust document collaboration. Every access, threshold-approved.
+                Threshold-locked. Cryptographically secured.
               </p>
             </div>
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
                 <Lock className="h-4 w-4 text-emerald-300" />
-                AES-256 Encryption
+                AES-256-GCM document encryption
               </div>
               <div className="flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
                 <ShieldCheck className="h-4 w-4 text-sky-300" />
-                Shamir&apos;s Secret Sharing
+                Shamir&apos;s Secret Sharing key distribution
               </div>
               <div className="flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
                 <Shield className="h-4 w-4 text-indigo-300" />
-                Immutable Audit Log
+                Immutable SHA-256 audit chain
+              </div>
+              <div className="flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                <Database className="h-4 w-4 text-violet-300" />
+                IPFS-backed encrypted storage
               </div>
             </div>
           </div>
@@ -50,7 +54,7 @@ export default function SignupPage() {
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 via-cyan-500 to-blue-600 shadow-[0_0_20px_rgba(56,189,248,0.4)] ring-1 ring-border">
                   <Shield className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-xl font-semibold text-foreground">ZeroTrust Docs</span>
+                <span className="text-xl font-semibold text-foreground">CodeApex TLS</span>
               </div>
             </div>
             <AuthForm type="signup" />
